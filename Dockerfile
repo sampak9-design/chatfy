@@ -24,13 +24,17 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
+# Standalone Next output (server.js + bundled node_modules including @prisma/client and bcryptjs)
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+
+# Install prisma CLI here so all its transitive deps (effect, etc) are present.
+# Standalone tracing doesn't include CLI, only the runtime client.
+RUN npm install --omit=dev --no-audit --no-fund prisma@^6.19.3 \
+    && chown -R nextjs:nodejs node_modules
 
 USER nextjs
 EXPOSE 3000
