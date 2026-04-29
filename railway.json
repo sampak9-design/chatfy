@@ -2,7 +2,7 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": { "builder": "DOCKERFILE", "dockerfilePath": "Dockerfile" },
   "deploy": {
-    "startCommand": "sh -c 'npx prisma db push --skip-generate --accept-data-loss && node prisma/seed.js && node server.js'",
+    "startCommand": "sh -c 'node node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss && node prisma/seed.js && node server.js'",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 5,
     "healthcheckPath": "/api/health",
