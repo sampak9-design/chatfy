@@ -79,7 +79,7 @@ export function StepNode({ id, data, selected }: NodeProps<FlowNodeData>) {
 
       {/* Bottom "out" handle for chaining without buttons. Hidden when buttons exist
           since the engine waits for a click and ignores the implicit next. */}
-      {data.type !== "start" && !(data.buttons && data.buttons.length > 0) && (
+      {!(data.buttons && data.buttons.length > 0) && (
         <Handle type="source" position={Position.Bottom} id="out" />
       )}
     </div>
