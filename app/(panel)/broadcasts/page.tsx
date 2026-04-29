@@ -54,12 +54,13 @@ export default async function BroadcastsPage() {
               <th className="text-right font-medium px-4 py-3">Enviadas</th>
               <th className="text-right font-medium px-4 py-3">Falhas</th>
               <th className="text-right font-medium px-4 py-3">Bloqueios</th>
+              <th className="text-left font-medium px-4 py-3">Agendado</th>
               <th className="text-left font-medium px-4 py-3">Criado</th>
             </tr>
           </thead>
           <tbody>
             {list.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-10" style={{ color: "var(--text-faint)" }}>Nenhum disparo ainda.</td></tr>
+              <tr><td colSpan={8} className="text-center py-10" style={{ color: "var(--text-faint)" }}>Nenhum disparo ainda.</td></tr>
             ) : list.map((b) => (
               <tr key={b.id} style={{ borderTop: "1px solid var(--border)" }}>
                 <td className="px-4 py-3">
@@ -69,12 +70,13 @@ export default async function BroadcastsPage() {
                   </Link>
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`pill ${b.status === "done" ? "pill-success" : b.status === "failed" ? "pill-danger" : b.status === "sending" ? "pill-warning" : "pill-muted"}`}>{b.status}</span>
+                  <span className={`pill ${b.status === "done" ? "pill-success" : b.status === "failed" ? "pill-danger" : b.status === "sending" ? "pill-warning" : b.status === "scheduled" ? "pill-info" : "pill-muted"}`}>{b.status}</span>
                 </td>
                 <td className="px-4 py-3 text-right">{b.totalTargets}</td>
                 <td className="px-4 py-3 text-right" style={{ color: "var(--success)" }}>{b.sentCount}</td>
                 <td className="px-4 py-3 text-right" style={{ color: "var(--danger)" }}>{b.failedCount}</td>
                 <td className="px-4 py-3 text-right" style={{ color: "var(--warning)" }}>{b.blockedCount}</td>
+                <td className="px-4 py-3 text-xs" style={{ color: "var(--text-dim)" }}>{b.scheduledFor ? fmt(b.scheduledFor) : "—"}</td>
                 <td className="px-4 py-3" style={{ color: "var(--text-faint)" }}>{fmt(b.createdAt)}</td>
               </tr>
             ))}

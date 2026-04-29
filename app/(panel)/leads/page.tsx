@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 interface SP {
   status?: string;
   origin?: string;
+  source?: string;
   q?: string;
   page?: string;
 }
@@ -34,6 +35,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
     botId: bot.id,
     ...(sp.status && Object.values(LeadStatus).includes(sp.status as LeadStatus) ? { status: sp.status as LeadStatus } : {}),
     ...(sp.origin && Object.values(LeadOrigin).includes(sp.origin as LeadOrigin) ? { origin: sp.origin as LeadOrigin } : {}),
+    ...(sp.source ? { source: sp.source } : {}),
     ...(sp.q
       ? {
           OR: [
@@ -46,9 +48,15 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
       : {}),
   };
 
-  const [total, leads] = await Promise.all([
+  const [total, leads, sources] = await Promise.all([
     prisma.lead.count({ where }),
     prisma.lead.findMany({ where, orderBy: { createdAt: "desc" }, take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE }),
+    prisma.lead.findMany({
+      where: { botId: bot.id, source: { not: null } },
+      distinct: ["source"],
+      select: { source: true },
+      take: 100,
+    }),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -62,7 +70,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         </div>
       </div>
 
-      <form className="card p-4 grid grid-cols-1 md:grid-cols-4 gap-3" method="get">
+      <form className="card p-4 grid grid-cols-1 md:grid-cols-5 gap-3" method="get">
         <input name="q" defaultValue={sp.q || ""} className="input" placeholder="Nome, username ou telegram_id" />
         <select name="status" defaultValue={sp.status || ""} className="input">
           <option value="">Todos os status</option>
@@ -76,6 +84,10 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           <option value="button">Botão</option>
           <option value="campaign">Campanha</option>
         </select>
+        <select name="source" defaultValue={sp.source || ""} className="input">
+          <option value="">Toda fonte (?start=)</option>
+          {sources.map((s) => s.source && <option key={s.source} value={s.source}>{s.source}</option>)}
+        </select>
         <button className="btn btn-primary">Filtrar</button>
       </form>
 
@@ -87,19 +99,21 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
               <th className="text-left font-medium px-4 py-3">Username</th>
               <th className="text-left font-medium px-4 py-3">Telegram ID</th>
               <th className="text-left font-medium px-4 py-3">Origem</th>
+              <th className="text-left font-medium px-4 py-3">Fonte</th>
               <th className="text-left font-medium px-4 py-3">Status</th>
               <th className="text-left font-medium px-4 py-3">Entrou</th>
             </tr>
           </thead>
           <tbody>
             {leads.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-10" style={{ color: "var(--text-faint)" }}>Nenhum lead encontrado.</td></tr>
+              <tr><td colSpan={7} className="text-center py-10" style={{ color: "var(--text-faint)" }}>Nenhum lead encontrado.</td></tr>
             ) : leads.map((l) => (
               <tr key={l.id} style={{ borderTop: "1px solid var(--border)" }}>
                 <td className="px-4 py-3">{[l.firstName, l.lastName].filter(Boolean).join(" ") || "—"}</td>
                 <td className="px-4 py-3" style={{ color: "var(--text-dim)" }}>{l.username ? `@${l.username}` : "—"}</td>
                 <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--text-faint)" }}>{l.telegramId}</td>
                 <td className="px-4 py-3"><span className="pill pill-muted">{l.origin}</span></td>
+                <td className="px-4 py-3 text-xs" style={{ color: "var(--text-dim)" }}>{l.source || "—"}</td>
                 <td className="px-4 py-3">
                   <span className={`pill ${l.status === "active" ? "pill-success" : l.status === "blocked" ? "pill-danger" : "pill-muted"}`}>{l.status}</span>
                 </td>

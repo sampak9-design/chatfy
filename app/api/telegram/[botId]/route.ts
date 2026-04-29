@@ -36,7 +36,12 @@ interface TgUpdate {
   callback_query?: TgCallbackQuery;
 }
 
-async function upsertLead(bot: Bot, user: TgUser, origin: "start" | "button" | "campaign" = "start"): Promise<Lead> {
+async function upsertLead(
+  bot: Bot,
+  user: TgUser,
+  origin: "start" | "button" | "campaign" = "start",
+  source?: string,
+): Promise<Lead> {
   const data = {
     firstName: user.first_name ?? null,
     lastName: user.last_name ?? null,
@@ -51,11 +56,13 @@ async function upsertLead(bot: Bot, user: TgUser, origin: "start" | "button" | "
       telegramId: String(user.id),
       origin,
       status: "active",
+      source: source ?? null,
       ...data,
     },
     update: {
       ...data,
-      // If they came back, mark active again
+      // Don't overwrite source if the lead already had one (preserve first-touch attribution).
+      // If they came back, mark active again.
       status: "active",
     },
   });
@@ -76,8 +83,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ botId: str
   const update = (await req.json()) as TgUpdate;
 
   try {
-    if (update.message?.text === "/start" && update.message.from) {
-      const lead = await upsertLead(bot, update.message.from, "start");
+    const text = update.message?.text;
+    if (text && text.startsWith("/start") && update.message?.from) {
+      // Telegram delivers `t.me/<bot>?start=foo` as the message text "/start foo".
+      // Capture everything after "/start " (max 64 chars per Telegram spec) as source.
+      const param = text.slice("/start".length).trim().slice(0, 64) || undefined;
+      const lead = await upsertLead(bot, update.message.from, "start", param);
       if (bot.welcomeFlowId) {
         // fire and forget — Telegram expects a 200 quickly
         startFlow(bot, lead, bot.welcomeFlowId).catch((e) => console.error("[startFlow]", e));

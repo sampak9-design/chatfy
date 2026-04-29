@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { tgSend, type TgKeyboard } from "./telegram";
+import { renderTemplate } from "./template";
 import type { Bot, FlowStep, Lead } from "@prisma/client";
 
 interface StepButton {
@@ -46,10 +47,11 @@ export async function runFlowFrom(bot: Bot, lead: Lead, startStepId: string) {
     }
 
     const buttons = buildKeyboard(step);
+    const rendered = renderTemplate(step.content, lead);
     const result = await tgSend(bot.token, {
       chatId: lead.telegramId,
-      text: step.content ?? undefined,
-      caption: step.content ?? undefined,
+      text: rendered ?? undefined,
+      caption: rendered ?? undefined,
       mediaUrl: step.mediaUrl ?? undefined,
       mediaType:
         step.type === "image" || step.type === "video" || step.type === "audio" || step.type === "document"

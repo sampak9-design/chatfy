@@ -5,6 +5,7 @@
 import { Worker } from "bullmq";
 import { prisma } from "../db";
 import { tgSend } from "../telegram";
+import { renderTemplate } from "../template";
 import { getRedis } from "./redis";
 import type { BroadcastJob } from "./broadcast-queue";
 import type { StepType } from "@prisma/client";
@@ -29,10 +30,19 @@ const worker = new Worker<BroadcastJob>(
     const mediaType = broadcast.mediaType as StepType | null;
     const isMedia = mediaType === "image" || mediaType === "video" || mediaType === "audio" || mediaType === "document";
 
+    // First job of a scheduled broadcast: flip status to "sending"
+    if (broadcast.status === "scheduled") {
+      await prisma.broadcast.updateMany({
+        where: { id: broadcastId, status: "scheduled" },
+        data: { status: "sending", startedAt: new Date() },
+      });
+    }
+
+    const rendered = renderTemplate(broadcast.text, lead);
     const result = await tgSend(broadcast.bot.token, {
       chatId: lead.telegramId,
-      text: broadcast.text ?? undefined,
-      caption: broadcast.text ?? undefined,
+      text: rendered ?? undefined,
+      caption: rendered ?? undefined,
       mediaUrl: broadcast.mediaUrl ?? undefined,
       mediaType: isMedia ? (mediaType as "image" | "video" | "audio" | "document") : undefined,
       buttons: broadcast.buttons as never,

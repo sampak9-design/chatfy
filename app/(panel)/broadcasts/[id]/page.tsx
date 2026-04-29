@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { ArrowLeft, Send, Save } from "lucide-react";
+import { ArrowLeft, Send, Save, Calendar, X } from "lucide-react";
 import { getBroadcastQueue } from "@/lib/queue/broadcast-queue";
 import { ButtonsEditorClient } from "@/components/BroadcastButtonsEditor";
 import type { StepType, LeadStatus, LeadOrigin } from "@prisma/client";
@@ -45,10 +45,23 @@ async function sendBroadcast(formData: FormData) {
   const id = String(formData.get("id"));
   const status = String(formData.get("targetStatus") || "active") as LeadStatus;
   const origin = String(formData.get("targetOrigin") || "");
+  const scheduledForRaw = String(formData.get("scheduledFor") || "").trim();
 
   const broadcast = await prisma.broadcast.findUnique({ where: { id } });
   if (!broadcast) return;
-  if (broadcast.status !== "draft" && broadcast.status !== "failed") return; // safety
+  if (broadcast.status !== "draft" && broadcast.status !== "failed" && broadcast.status !== "scheduled") return;
+
+  // Parse schedule. Empty = send now. We treat the input as the user's local time
+  // (datetime-local), which is what the browser hands us — convert to ms delay.
+  let scheduledFor: Date | null = null;
+  let delayMs = 0;
+  if (scheduledForRaw) {
+    const parsed = new Date(scheduledForRaw);
+    if (!isNaN(parsed.getTime()) && parsed.getTime() > Date.now() + 5_000) {
+      scheduledFor = parsed;
+      delayMs = parsed.getTime() - Date.now();
+    }
+  }
 
   const where = {
     botId: broadcast.botId,
@@ -66,12 +79,14 @@ async function sendBroadcast(formData: FormData) {
   await prisma.broadcast.update({
     where: { id },
     data: {
-      status: "sending",
-      startedAt: new Date(),
+      status: scheduledFor ? "scheduled" : "sending",
+      scheduledFor,
+      startedAt: scheduledFor ? null : new Date(),
       totalTargets: leads.length,
       sentCount: 0,
       failedCount: 0,
       blockedCount: 0,
+      finishedAt: null,
       targetFilter: { status, origin: origin || undefined },
     },
   });
@@ -81,12 +96,37 @@ async function sendBroadcast(formData: FormData) {
     leads.map((l) => ({
       name: "send",
       data: { broadcastId: id, leadId: l.id },
-      opts: { jobId: `${id}:${l.id}` }, // dedup key
+      opts: {
+        jobId: `${id}:${l.id}`,
+        ...(delayMs > 0 ? { delay: delayMs } : {}),
+      },
     })),
   );
 
   revalidatePath(`/broadcasts/${id}`);
   redirect(`/broadcasts/${id}`);
+}
+
+async function cancelSchedule(formData: FormData) {
+  "use server";
+  const id = String(formData.get("id"));
+  const broadcast = await prisma.broadcast.findUnique({ where: { id } });
+  if (!broadcast || broadcast.status !== "scheduled") return;
+
+  // Remove all queued (delayed) jobs belonging to this broadcast.
+  const queue = getBroadcastQueue();
+  const jobs = await queue.getJobs(["delayed", "waiting"]);
+  await Promise.all(
+    jobs
+      .filter((j) => j.data.broadcastId === id)
+      .map((j) => j.remove().catch(() => {})),
+  );
+
+  await prisma.broadcast.update({
+    where: { id },
+    data: { status: "draft", scheduledFor: null, totalTargets: 0 },
+  });
+  revalidatePath(`/broadcasts/${id}`);
 }
 
 export default async function BroadcastDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -95,6 +135,7 @@ export default async function BroadcastDetailPage({ params }: { params: Promise<
   if (!b) notFound();
 
   const editable = b.status === "draft" || b.status === "failed";
+  const isScheduled = b.status === "scheduled";
   const buttons: ButtonItem[] = (() => {
     const raw = b.buttons as unknown as { text: string; url: string }[][] | null;
     if (!Array.isArray(raw)) return [];
@@ -109,7 +150,23 @@ export default async function BroadcastDetailPage({ params }: { params: Promise<
         <span className={`pill ${b.status === "done" ? "pill-success" : b.status === "failed" ? "pill-danger" : b.status === "sending" ? "pill-warning" : "pill-muted"}`}>{b.status}</span>
       </div>
 
-      {!editable ? (
+      {isScheduled ? (
+        <div className="card p-6 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(59,130,246,0.12)", color: "var(--info)" }}>
+              <Calendar className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <div className="font-medium">Agendado para {b.scheduledFor ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeStyle: "short" }).format(b.scheduledFor) : "—"}</div>
+              <div className="text-sm" style={{ color: "var(--text-dim)" }}>Alvo: {b.totalTargets} lead(s). O envio começa automaticamente no horário marcado.</div>
+            </div>
+          </div>
+          <form action={cancelSchedule}>
+            <input type="hidden" name="id" value={b.id} />
+            <button type="submit" className="btn btn-danger"><X className="w-4 h-4" /> Cancelar agendamento</button>
+          </form>
+        </div>
+      ) : !editable ? (
         <div className="card p-6 space-y-3">
           <p className="text-sm" style={{ color: "var(--text-dim)" }}>Este disparo já foi enviado e não pode mais ser editado.</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
@@ -151,7 +208,7 @@ export default async function BroadcastDetailPage({ params }: { params: Promise<
 
           <form action={sendBroadcast} className="card p-6 space-y-4">
             <input type="hidden" name="id" value={b.id} />
-            <h2 className="font-semibold">Enviar agora</h2>
+            <h2 className="font-semibold">Enviar / agendar</h2>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">Status do lead</label>
@@ -170,9 +227,21 @@ export default async function BroadcastDetailPage({ params }: { params: Promise<
                 </select>
               </div>
             </div>
-            <button type="submit" className="btn btn-primary"><Send className="w-4 h-4" /> Disparar</button>
+            <div>
+              <label className="label">Agendar para (opcional)</label>
+              <input
+                name="scheduledFor"
+                type="datetime-local"
+                className="input"
+              />
+              <p className="text-[11px] mt-1" style={{ color: "var(--text-faint)" }}>
+                Deixe em branco para disparar agora. Se preencher, os jobs ficam parados no Redis até o horário marcado.
+              </p>
+            </div>
+            <button type="submit" className="btn btn-primary"><Send className="w-4 h-4" /> Disparar / Agendar</button>
             <p className="text-xs" style={{ color: "var(--text-faint)" }}>
-              Os jobs vão para a fila Redis e o worker envia respeitando o limite do Telegram (~25/s).
+              Variáveis suportadas no texto: <code>{"{first_name}"}</code>, <code>{"{username}"}</code>, <code>{"{full_name}"}</code>, <code>{"{source}"}</code>.
+              Worker respeita ~25 msg/s do Telegram.
             </p>
           </form>
         </>

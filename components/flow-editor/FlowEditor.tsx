@@ -291,7 +291,7 @@ function PropertiesPanel({
               placeholder={data.type === "text" ? "Digite sua mensagem (suporta HTML)…" : "Legenda opcional"}
             />
             <p className="text-[11px] mt-1" style={{ color: "var(--text-faint)" }}>
-              Suporta HTML: <code>&lt;b&gt;, &lt;i&gt;, &lt;a href&gt;</code>
+              HTML: <code>&lt;b&gt;</code>, <code>&lt;i&gt;</code>, <code>&lt;a href&gt;</code> · Variáveis: <code>{"{first_name}"}</code>, <code>{"{username}"}</code>, <code>{"{full_name}"}</code>, <code>{"{source}"}</code>
             </p>
           </div>
 

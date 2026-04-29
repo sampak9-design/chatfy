@@ -60,6 +60,7 @@ model Lead {
   phone          String?
   status         LeadStatus @default(active)
   origin         LeadOrigin @default(start)
+  source         String?    // free-form tracking from /start <param>, e.g. "fb_ad_campaign_1"
   languageCode   String?
   currentFlowId  String?
   currentStepId  String?
@@ -129,6 +130,7 @@ model FlowStep {
 
 enum BroadcastStatus {
   draft
+  scheduled
   queued
   sending
   done
@@ -144,6 +146,7 @@ model Broadcast {
   mediaType    StepType?       // image | video | audio | document
   buttons      Json?
   status       BroadcastStatus @default(draft)
+  scheduledFor DateTime?       // when set, jobs are enqueued with delay; status starts as "scheduled"
   targetFilter Json?           // { status?: "active", origin?: "start", ... }
   totalTargets Int             @default(0)
   sentCount    Int             @default(0)
