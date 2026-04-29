@@ -1,0 +1,186 @@
+// Chatfy — Telegram bot management platform
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("admin_users")
+}
+
+model Bot {
+  id              String   @id @default(cuid())
+  name            String
+  token           String   @unique
+  username        String?
+  welcomeFlowId   String?
+  active          Boolean  @default(true)
+  webhookSecret   String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  leads        Lead[]
+  flows        Flow[]
+  broadcasts   Broadcast[]
+  welcomeFlow  Flow?      @relation("WelcomeFlow", fields: [welcomeFlowId], references: [id])
+
+  @@map("bots")
+}
+
+enum LeadStatus {
+  active
+  blocked
+  unsubscribed
+}
+
+enum LeadOrigin {
+  start
+  button
+  campaign
+}
+
+model Lead {
+  id             String     @id @default(cuid())
+  botId          String
+  telegramId     String
+  firstName      String?
+  lastName       String?
+  username       String?
+  phone          String?
+  status         LeadStatus @default(active)
+  origin         LeadOrigin @default(start)
+  languageCode   String?
+  currentFlowId  String?
+  currentStepId  String?
+  lastInteraction DateTime  @default(now())
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  bot           Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
+  currentFlow   Flow?   @relation("LeadCurrentFlow", fields: [currentFlowId], references: [id])
+  broadcastLogs BroadcastLog[]
+
+  @@unique([botId, telegramId])
+  @@index([botId, status])
+  @@index([botId, createdAt])
+  @@map("leads")
+}
+
+model Flow {
+  id          String   @id @default(cuid())
+  botId       String
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  graph       Json     // ReactFlow graph: { nodes: [...], edges: [...] } — source of truth for the editor
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  bot          Bot          @relation(fields: [botId], references: [id], onDelete: Cascade)
+  steps        FlowStep[]
+  welcomeForBots Bot[]      @relation("WelcomeFlow")
+  leadsHere    Lead[]       @relation("LeadCurrentFlow")
+
+  @@index([botId])
+  @@map("flows")
+}
+
+enum StepType {
+  text
+  image
+  video
+  audio
+  document
+  delay
+  buttons
+}
+
+model FlowStep {
+  id           String   @id @default(cuid())
+  flowId       String
+  nodeId       String   // matches the React Flow node id inside Flow.graph
+  type         StepType
+  content      String?  // text body / caption
+  mediaUrl     String?
+  buttons      Json?    // [{ id, label, kind: "url"|"callback"|"support", value, nextStepId? }]
+  delaySeconds Int?
+  isEntry      Boolean  @default(false)
+  nextStepId   String?  // implicit next step (when no buttons), references another FlowStep.id
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  flow Flow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+
+  @@unique([flowId, nodeId])
+  @@index([flowId])
+  @@map("flow_steps")
+}
+
+enum BroadcastStatus {
+  draft
+  queued
+  sending
+  done
+  failed
+}
+
+model Broadcast {
+  id           String          @id @default(cuid())
+  botId        String
+  name         String
+  text         String?
+  mediaUrl     String?
+  mediaType    StepType?       // image | video | audio | document
+  buttons      Json?
+  status       BroadcastStatus @default(draft)
+  targetFilter Json?           // { status?: "active", origin?: "start", ... }
+  totalTargets Int             @default(0)
+  sentCount    Int             @default(0)
+  failedCount  Int             @default(0)
+  blockedCount Int             @default(0)
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  bot  Bot            @relation(fields: [botId], references: [id], onDelete: Cascade)
+  logs BroadcastLog[]
+
+  @@index([botId, createdAt])
+  @@map("broadcasts")
+}
+
+enum DeliveryStatus {
+  pending
+  sent
+  failed
+  blocked
+}
+
+model BroadcastLog {
+  id           String         @id @default(cuid())
+  broadcastId  String
+  leadId       String
+  status       DeliveryStatus @default(pending)
+  errorMessage String?
+  sentAt       DateTime?
+  createdAt    DateTime       @default(now())
+
+  broadcast Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  lead      Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([broadcastId, leadId])
+  @@index([broadcastId, status])
+  @@map("broadcast_logs")
+}

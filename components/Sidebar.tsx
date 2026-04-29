@@ -1,0 +1,71 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { LayoutDashboard, Users, Workflow, Megaphone, Settings, LogOut, Bot } from "lucide-react";
+
+const items = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/leads", label: "Leads", icon: Users },
+  { href: "/flows", label: "Fluxos", icon: Workflow },
+  { href: "/broadcasts", label: "Disparos", icon: Megaphone },
+  { href: "/bot", label: "Bot", icon: Settings },
+];
+
+export function Sidebar({ adminEmail }: { adminEmail?: string }) {
+  const pathname = usePathname();
+  return (
+    <aside
+      className="w-60 shrink-0 flex flex-col h-screen sticky top-0"
+      style={{ background: "var(--surface)", borderRight: "1px solid var(--border)" }}
+    >
+      <div className="p-5 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border)" }}>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "var(--primary)" }}>
+          <Bot className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <div className="font-semibold leading-tight">Chatfy</div>
+          <div className="text-[11px]" style={{ color: "var(--text-faint)" }}>Telegram bot manager</div>
+        </div>
+      </div>
+
+      <nav className="flex-1 p-3 space-y-1">
+        {items.map((it) => {
+          const active = it.href === "/" ? pathname === "/" : pathname.startsWith(it.href);
+          const Icon = it.icon;
+          return (
+            <Link
+              key={it.href}
+              href={it.href}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors"
+              style={{
+                background: active ? "var(--surface-3)" : "transparent",
+                color: active ? "var(--text)" : "var(--text-dim)",
+                borderLeft: active ? "3px solid var(--primary)" : "3px solid transparent",
+                paddingLeft: active ? "9px" : "12px",
+              }}
+            >
+              <Icon className="w-4 h-4" />
+              {it.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <form action="/api/auth/logout" method="post" className="p-3" style={{ borderTop: "1px solid var(--border)" }}>
+        <div className="px-3 py-2 mb-2">
+          <div className="text-[11px]" style={{ color: "var(--text-faint)" }}>Logado como</div>
+          <div className="text-xs truncate" style={{ color: "var(--text-dim)" }}>{adminEmail || "—"}</div>
+        </div>
+        <button
+          type="submit"
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm w-full transition-colors"
+          style={{ color: "var(--text-dim)" }}
+        >
+          <LogOut className="w-4 h-4" />
+          Sair
+        </button>
+      </form>
+    </aside>
+  );
+}
