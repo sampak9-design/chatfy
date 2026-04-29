@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Workflow, Megaphone, Settings, LogOut, Bot } from "lucide-react";
+import { LayoutDashboard, Users, Workflow, Megaphone, Settings, LogOut, Bot, MessageSquare } from "lucide-react";
 
 const items = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/inbox", label: "Conversas", icon: MessageSquare },
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/flows", label: "Fluxos", icon: Workflow },
   { href: "/broadcasts", label: "Disparos", icon: Megaphone },

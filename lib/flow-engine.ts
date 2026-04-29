@@ -74,6 +74,25 @@ export async function runFlowFrom(bot: Bot, lead: Lead, startStepId: string) {
       return;
     }
 
+    // Persist outgoing message for the inbox conversation history.
+    if (result.ok) {
+      const kind: "text" | "image" | "video" | "audio" | "document" =
+        step.type === "image" || step.type === "video" || step.type === "audio" || step.type === "document"
+          ? step.type
+          : "text";
+      await prisma.message.create({
+        data: {
+          botId: bot.id,
+          leadId: lead.id,
+          direction: "out",
+          kind,
+          text: rendered ?? null,
+          mediaUrl: step.mediaUrl ?? null,
+          fromAdmin: false,
+        },
+      });
+    }
+
     await prisma.lead.update({
       where: { id: lead.id },
       data: {

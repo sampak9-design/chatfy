@@ -71,11 +71,47 @@ model Lead {
   bot           Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
   currentFlow   Flow?   @relation("LeadCurrentFlow", fields: [currentFlowId], references: [id])
   broadcastLogs BroadcastLog[]
+  messages      Message[]
 
   @@unique([botId, telegramId])
   @@index([botId, status])
   @@index([botId, createdAt])
+  @@index([botId, lastInteraction])
   @@map("leads")
+}
+
+enum MessageDirection {
+  in
+  out
+}
+
+enum MessageKind {
+  text
+  image
+  video
+  audio
+  document
+  sticker
+  other
+}
+
+model Message {
+  id         String           @id @default(cuid())
+  botId      String
+  leadId     String
+  direction  MessageDirection
+  kind       MessageKind      @default(text)
+  text       String?
+  mediaUrl   String?          // for outgoing: the URL we sent. For incoming: not stored (Telegram file_id stored instead).
+  fileId     String?          // Telegram file_id for incoming media (so we can re-fetch later if needed)
+  fromAdmin  Boolean          @default(false) // outgoing: true if sent manually from inbox, false if from flow/broadcast
+  createdAt  DateTime         @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, createdAt])
+  @@index([botId, createdAt])
+  @@map("messages")
 }
 
 model Flow {

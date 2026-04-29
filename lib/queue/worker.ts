@@ -49,6 +49,9 @@ const worker = new Worker<BroadcastJob>(
     });
 
     if (result.ok) {
+      const kind: "text" | "image" | "video" | "audio" | "document" = isMedia
+        ? (mediaType as "image" | "video" | "audio" | "document")
+        : "text";
       await prisma.$transaction([
         prisma.broadcastLog.upsert({
           where: { broadcastId_leadId: { broadcastId, leadId } },
@@ -56,6 +59,17 @@ const worker = new Worker<BroadcastJob>(
           update: { status: "sent", sentAt: new Date(), errorMessage: null },
         }),
         prisma.broadcast.update({ where: { id: broadcastId }, data: { sentCount: { increment: 1 } } }),
+        prisma.message.create({
+          data: {
+            botId: broadcast.botId,
+            leadId,
+            direction: "out",
+            kind,
+            text: rendered ?? null,
+            mediaUrl: broadcast.mediaUrl ?? null,
+            fromAdmin: false,
+          },
+        }),
       ]);
     } else if (result.blocked) {
       await prisma.$transaction([

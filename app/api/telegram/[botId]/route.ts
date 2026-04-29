@@ -15,12 +15,22 @@ interface TgUser {
   language_code?: string;
 }
 
+interface TgPhotoSize { file_id: string; width: number; height: number }
+interface TgFile { file_id: string; mime_type?: string }
+
 interface TgMessage {
   message_id: number;
   from?: TgUser;
   chat: { id: number };
   text?: string;
+  caption?: string;
   contact?: { phone_number?: string };
+  photo?: TgPhotoSize[];
+  video?: TgFile;
+  audio?: TgFile;
+  voice?: TgFile;
+  document?: TgFile;
+  sticker?: TgFile;
 }
 
 interface TgCallbackQuery {
@@ -34,6 +44,31 @@ interface TgUpdate {
   update_id: number;
   message?: TgMessage;
   callback_query?: TgCallbackQuery;
+}
+
+async function storeIncoming(botId: string, leadId: string, msg: TgMessage) {
+  // Pick the best media we can persist for the inbox.
+  let kind: "text" | "image" | "video" | "audio" | "document" | "sticker" | "other" = "text";
+  let fileId: string | undefined;
+  if (msg.photo && msg.photo.length > 0) {
+    kind = "image";
+    fileId = msg.photo[msg.photo.length - 1].file_id; // largest size
+  } else if (msg.video) { kind = "video"; fileId = msg.video.file_id; }
+  else if (msg.audio || msg.voice) { kind = "audio"; fileId = (msg.audio || msg.voice)!.file_id; }
+  else if (msg.document) { kind = "document"; fileId = msg.document.file_id; }
+  else if (msg.sticker) { kind = "sticker"; fileId = msg.sticker.file_id; }
+  else if (!msg.text) { kind = "other"; }
+
+  await prisma.message.create({
+    data: {
+      botId,
+      leadId,
+      direction: "in",
+      kind,
+      text: msg.text || msg.caption || null,
+      fileId: fileId || null,
+    },
+  });
 }
 
 async function upsertLead(
@@ -83,14 +118,15 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ botId: str
   const update = (await req.json()) as TgUpdate;
 
   try {
-    const text = update.message?.text;
-    if (text && text.startsWith("/start") && update.message?.from) {
+    const msg = update.message;
+    const text = msg?.text;
+
+    if (text && text.startsWith("/start") && msg?.from) {
       // Telegram delivers `t.me/<bot>?start=foo` as the message text "/start foo".
-      // Capture everything after "/start " (max 64 chars per Telegram spec) as source.
       const param = text.slice("/start".length).trim().slice(0, 64) || undefined;
-      const lead = await upsertLead(bot, update.message.from, "start", param);
+      const lead = await upsertLead(bot, msg.from, "start", param);
+      await storeIncoming(bot.id, lead.id, msg);
       if (bot.welcomeFlowId) {
-        // fire and forget — Telegram expects a 200 quickly
         startFlow(bot, lead, bot.welcomeFlowId).catch((e) => console.error("[startFlow]", e));
       }
     } else if (update.callback_query?.data?.startsWith("step:")) {
@@ -99,9 +135,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ botId: str
       const buttonId = cq.data!.slice("step:".length);
       tgAnswerCallback(bot.token, cq.id).catch(() => {});
       handleButtonCallback(bot, lead, buttonId).catch((e) => console.error("[callback]", e));
-    } else if (update.message?.from) {
-      // Any other message — at least keep lead fresh
-      await upsertLead(bot, update.message.from, "start");
+    } else if (msg?.from) {
+      const lead = await upsertLead(bot, msg.from, "start");
+      await storeIncoming(bot.id, lead.id, msg);
     }
   } catch (e) {
     console.error("[webhook]", e);
