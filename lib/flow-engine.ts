@@ -58,6 +58,12 @@ export async function runFlowFrom(bot: Bot, lead: Lead, startStepId: string) {
       buttons,
     });
 
+    if (!result.ok) {
+      console.error(
+        `[flow] tg send failed step=${step.id} type=${step.type} code=${result.errorCode} desc=${result.description}`,
+      );
+    }
+
     if (!result.ok && result.blocked) {
       await prisma.lead.update({
         where: { id: lead.id },

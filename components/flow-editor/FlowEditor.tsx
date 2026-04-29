@@ -302,8 +302,19 @@ function PropertiesPanel({
                 value={data.mediaUrl || ""}
                 onChange={(e) => onChange({ mediaUrl: e.target.value })}
                 className="input"
-                placeholder="https://exemplo.com/midia.jpg"
+                placeholder={
+                  data.type === "video" ? "https://exemplo.com/video.mp4"
+                  : data.type === "audio" ? "https://exemplo.com/audio.mp3"
+                  : data.type === "document" ? "https://exemplo.com/arquivo.pdf"
+                  : "https://exemplo.com/imagem.jpg"
+                }
               />
+              <p className="text-[11px] mt-1" style={{ color: "var(--text-faint)" }}>
+                {data.type === "video" && "Link DIRETO ao .mp4 (Cloudinary, S3, etc). Telegram precisa baixar o arquivo."}
+                {data.type === "audio" && "Link DIRETO ao .mp3, .ogg ou .m4a."}
+                {data.type === "document" && "Link DIRETO ao arquivo (.pdf, .zip, etc)."}
+                {data.type === "image" && "Link DIRETO ao .jpg/.png/.webp (max 10MB)."}
+              </p>
             </div>
           )}
         </>
