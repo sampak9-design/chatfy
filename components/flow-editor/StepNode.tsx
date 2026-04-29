@@ -58,7 +58,7 @@ export function StepNode({ id, data, selected }: NodeProps<FlowNodeData>) {
         </div>
       )}
 
-      {data.type === "buttons" && data.buttons && data.buttons.length > 0 && (
+      {data.buttons && data.buttons.length > 0 && (
         <div className="border-t" style={{ borderColor: "var(--border)" }}>
           {data.buttons.map((b, i) => (
             <div key={b.id} className="relative px-3 py-2 text-xs flex items-center justify-between" style={{ borderTop: i === 0 ? "none" : "1px solid var(--border)" }}>
@@ -77,7 +77,9 @@ export function StepNode({ id, data, selected }: NodeProps<FlowNodeData>) {
         </div>
       )}
 
-      {data.type !== "buttons" && (
+      {/* Bottom "out" handle for chaining without buttons. Hidden when buttons exist
+          since the engine waits for a click and ignores the implicit next. */}
+      {data.type !== "start" && !(data.buttons && data.buttons.length > 0) && (
         <Handle type="source" position={Position.Bottom} id="out" />
       )}
     </div>

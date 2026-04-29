@@ -320,10 +320,10 @@ function PropertiesPanel({
         </>
       )}
 
-      {data.type === "buttons" && (
+      {data.type !== "delay" && data.type !== "start" && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="label" style={{ marginBottom: 0 }}>Botões</label>
+            <label className="label" style={{ marginBottom: 0 }}>Botões (opcional)</label>
             <button onClick={addButton} className="btn btn-ghost text-xs" style={{ padding: "4px 10px" }}>
               <Plus className="w-3.5 h-3.5" /> Adicionar
             </button>
