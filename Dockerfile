@@ -37,5 +37,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# Run migrations on boot, then start. Railway sets DATABASE_URL automatically.
-CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node server.js"]
+# Push schema to DB, seed admin, then start. Railway/host injects DATABASE_URL.
+CMD ["sh", "-c", "npx prisma db push --skip-generate --accept-data-loss && node prisma/seed.js && node server.js"]
