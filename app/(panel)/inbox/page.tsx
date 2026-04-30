@@ -214,10 +214,17 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
                 </div>
               ) : messages.map((m) => {
                 const isOut = m.direction === "out";
+                // Outgoing media uses the public URL we sent. Incoming media is proxied through
+                // /api/tg-file/<botId>/<fileId> (auth-protected) to resolve Telegram file_ids.
+                const src = m.mediaUrl
+                  ? m.mediaUrl
+                  : m.fileId
+                    ? `/api/tg-file/${bot.id}/${m.fileId}`
+                    : null;
                 return (
                   <div key={m.id} className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
                     <div
-                      className="max-w-[70%] rounded-2xl px-4 py-2"
+                      className="max-w-[70%] rounded-2xl px-3 py-2 space-y-2"
                       style={{
                         background: isOut
                           ? (m.fromAdmin ? "var(--primary)" : "var(--surface-3)")
@@ -227,14 +234,28 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
                         borderTopLeftRadius: isOut ? 16 : 4,
                       }}
                     >
-                      {m.kind !== "text" && (
-                        <div className="text-[11px] uppercase tracking-wide opacity-70 mb-1">[{m.kind}]</div>
+                      {src && m.kind === "image" && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={src} alt="" className="rounded-lg" style={{ maxWidth: 320, maxHeight: 240, objectFit: "cover" }} />
                       )}
-                      {m.mediaUrl && (
-                        <div className="text-[10px] opacity-60 mb-1 truncate" style={{ maxWidth: 280 }}>{m.mediaUrl}</div>
+                      {src && m.kind === "video" && (
+                        <video src={src} controls className="rounded-lg" style={{ maxWidth: 320, maxHeight: 240 }} />
                       )}
-                      {m.text && <div className="text-sm whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: m.text }} />}
-                      <div className="text-[10px] opacity-60 mt-1 text-right">
+                      {src && m.kind === "audio" && (
+                        <audio src={src} controls style={{ width: 280 }} />
+                      )}
+                      {src && m.kind === "document" && (
+                        <a href={src} target="_blank" rel="noopener" className="flex items-center gap-2 text-sm underline">
+                          📎 Baixar documento
+                        </a>
+                      )}
+                      {!src && m.kind !== "text" && (
+                        <div className="text-[11px] uppercase tracking-wide opacity-70">[{m.kind}]</div>
+                      )}
+                      {m.text && (
+                        <div className="text-sm whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: m.text }} />
+                      )}
+                      <div className="text-[10px] opacity-60 text-right">
                         {fmtTime(m.createdAt)}
                         {isOut && m.fromAdmin && " · admin"}
                         {isOut && !m.fromAdmin && " · bot"}
