@@ -22,6 +22,7 @@ import { nanoid } from "nanoid";
 import { ArrowLeft, Save, Star, MessageSquare, Image as ImageIcon, Video, Music, FileText, Clock, MousePointerClick, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { StepNode } from "./StepNode";
+import { CopyFlowLink } from "@/components/CopyFlowLink";
 import type { FlowGraph, FlowNode, FlowNodeData, StepButton, StepKind } from "./types";
 
 const nodeTypes = { step: StepNode };
@@ -43,6 +44,7 @@ interface Props {
   saveAction: (formData: FormData) => Promise<void>;
   setAsWelcomeAction: (formData: FormData) => Promise<void>;
   isWelcome: boolean;
+  deepLink: string | null;
 }
 
 function defaultDataFor(kind: StepKind): FlowNodeData {
@@ -150,6 +152,7 @@ function FlowEditorInner(props: Props) {
           {props.isWelcome && <span className="pill pill-info">Boas-vindas</span>}
         </div>
         <div className="flex items-center gap-2">
+          {props.deepLink && <CopyFlowLink url={props.deepLink} compact />}
           {!props.isWelcome && (
             <form action={props.setAsWelcomeAction}>
               <input type="hidden" name="id" value={props.flowId} />

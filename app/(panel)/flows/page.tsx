@@ -3,6 +3,7 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Workflow, Plus, Trash2 } from "lucide-react";
+import { CopyFlowLink } from "@/components/CopyFlowLink";
 
 export const dynamic = "force-dynamic";
 
@@ -58,28 +59,36 @@ export default async function FlowsPage() {
       </form>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {flows.map((f) => (
-          <div key={f.id} className="card p-5 card-hover">
-            <Link href={`/flows/${f.id}`} className="block">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(249,115,22,0.12)", color: "var(--primary)" }}>
-                  <Workflow className="w-4 h-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium truncate">{f.name}</div>
-                  <div className="text-xs" style={{ color: "var(--text-faint)" }}>
-                    {f.id === bot.welcomeFlowId && <span className="pill pill-info mr-2">Boas-vindas</span>}
-                    Atualizado {f.updatedAt.toLocaleDateString("pt-BR")}
+        {flows.map((f) => {
+          const deepLink = bot.username
+            ? `https://t.me/${bot.username}?start=f_${f.id}`
+            : null;
+          return (
+            <div key={f.id} className="card p-5 card-hover">
+              <Link href={`/flows/${f.id}`} className="block">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "rgba(249,115,22,0.12)", color: "var(--primary)" }}>
+                    <Workflow className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium truncate">{f.name}</div>
+                    <div className="text-xs" style={{ color: "var(--text-faint)" }}>
+                      {f.id === bot.welcomeFlowId && <span className="pill pill-info mr-2">Boas-vindas</span>}
+                      Atualizado {f.updatedAt.toLocaleDateString("pt-BR")}
+                    </div>
                   </div>
                 </div>
+              </Link>
+              <div className="flex items-center justify-between gap-2">
+                {deepLink ? <CopyFlowLink url={deepLink} compact /> : <span className="text-xs" style={{ color: "var(--text-faint)" }}>username do bot indisponível</span>}
+                <form action={deleteFlow}>
+                  <input type="hidden" name="id" value={f.id} />
+                  <button className="btn btn-danger text-xs" style={{ padding: "4px 10px" }}><Trash2 className="w-3.5 h-3.5" /></button>
+                </form>
               </div>
-            </Link>
-            <form action={deleteFlow} className="flex justify-end">
-              <input type="hidden" name="id" value={f.id} />
-              <button className="btn btn-danger text-xs" style={{ padding: "4px 10px" }}><Trash2 className="w-3.5 h-3.5" /> Excluir</button>
-            </form>
-          </div>
-        ))}
+            </div>
+          );
+        })}
         {flows.length === 0 && (
           <div className="card p-8 text-center md:col-span-3" style={{ color: "var(--text-dim)" }}>
             Você ainda não criou nenhum fluxo.

@@ -116,6 +116,7 @@ export default async function FlowEditorPage({ params }: { params: Promise<{ id:
 
   const graph = (flow.graph as unknown as FlowGraph) || { nodes: [], edges: [] };
   const isWelcome = bot?.welcomeFlowId === flow.id;
+  const deepLink = bot?.username ? `https://t.me/${bot.username}?start=f_${flow.id}` : null;
 
   return (
     <FlowEditor
@@ -125,6 +126,7 @@ export default async function FlowEditorPage({ params }: { params: Promise<{ id:
       saveAction={saveFlow}
       setAsWelcomeAction={setAsWelcome}
       isWelcome={isWelcome}
+      deepLink={deepLink}
     />
   );
 }

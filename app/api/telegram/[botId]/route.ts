@@ -124,10 +124,22 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ botId: str
     if (text && text.startsWith("/start") && msg?.from) {
       // Telegram delivers `t.me/<bot>?start=foo` as the message text "/start foo".
       const param = text.slice("/start".length).trim().slice(0, 64) || undefined;
+
+      // Deep-link convention: `f_<flowId>` triggers that specific flow instead of the welcome flow.
+      let targetFlowId: string | null = bot.welcomeFlowId ?? null;
+      if (param?.startsWith("f_")) {
+        const flowId = param.slice(2);
+        const flow = await prisma.flow.findFirst({
+          where: { id: flowId, botId: bot.id, active: true },
+          select: { id: true },
+        });
+        if (flow) targetFlowId = flow.id;
+      }
+
       const lead = await upsertLead(bot, msg.from, "start", param);
       await storeIncoming(bot.id, lead.id, msg);
-      if (bot.welcomeFlowId) {
-        startFlow(bot, lead, bot.welcomeFlowId).catch((e) => console.error("[startFlow]", e));
+      if (targetFlowId) {
+        startFlow(bot, lead, targetFlowId).catch((e) => console.error("[startFlow]", e));
       }
     } else if (update.callback_query?.data?.startsWith("step:")) {
       const cq = update.callback_query;
