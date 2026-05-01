@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { tgAnswerCallback } from "@/lib/telegram";
 import { handleButtonCallback, startFlow } from "@/lib/flow-engine";
+import { sendCapiEvent } from "@/lib/meta-capi";
 import type { Bot, Lead } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -125,8 +126,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ botId: str
       // Telegram delivers `t.me/<bot>?start=foo` as the message text "/start foo".
       const param = text.slice("/start".length).trim().slice(0, 64) || undefined;
 
-      // Deep-link convention: `f_<flowId>` triggers that specific flow instead of the welcome flow.
+      // Deep-link conventions:
+      //   t_<sessionId> → tracking session from a Chatfy landing (fires Lead CAPI)
+      //   f_<flowId>    → start that specific flow instead of welcome
       let targetFlowId: string | null = bot.welcomeFlowId ?? null;
+      let trackingSessionId: string | null = null;
+
       if (param?.startsWith("f_")) {
         const flowId = param.slice(2);
         const flow = await prisma.flow.findFirst({
@@ -134,10 +139,35 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ botId: str
           select: { id: true },
         });
         if (flow) targetFlowId = flow.id;
+      } else if (param?.startsWith("t_")) {
+        const sessionId = param.slice(2);
+        const session = await prisma.trackingSession.findFirst({
+          where: { id: sessionId, botId: bot.id },
+          include: { landing: true },
+        });
+        if (session) {
+          trackingSessionId = session.id;
+          if (session.landing?.flowId) targetFlowId = session.landing.flowId;
+        }
       }
 
       const lead = await upsertLead(bot, msg.from, "start", param);
       await storeIncoming(bot.id, lead.id, msg);
+
+      // Link the tracking session to the lead and fire Lead CAPI
+      if (trackingSessionId) {
+        const session = await prisma.trackingSession.update({
+          where: { id: trackingSessionId },
+          data: { leadId: lead.id, leadAt: new Date() },
+        });
+        sendCapiEvent({
+          bot,
+          session,
+          type: "Lead",
+          externalId: lead.telegramId,
+        }).catch((e) => console.error("[capi lead]", e));
+      }
+
       if (targetFlowId) {
         startFlow(bot, lead, targetFlowId).catch((e) => console.error("[startFlow]", e));
       }

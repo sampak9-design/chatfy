@@ -27,13 +27,22 @@ model Bot {
   welcomeFlowId   String?
   active          Boolean  @default(true)
   webhookSecret   String
+  // Meta Conversions API (Facebook Ads)
+  metaPixelId     String?
+  metaAccessToken String?
+  metaTestCode    String?  // optional: filter as "test_event" in Events Manager
+  // Postback secret (corretora calls /api/track/registered?secret=...)
+  postbackSecret  String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  leads        Lead[]
-  flows        Flow[]
-  broadcasts   Broadcast[]
-  welcomeFlow  Flow?      @relation("WelcomeFlow", fields: [welcomeFlowId], references: [id])
+  leads             Lead[]
+  flows             Flow[]
+  broadcasts        Broadcast[]
+  welcomeFlow       Flow?              @relation("WelcomeFlow", fields: [welcomeFlowId], references: [id])
+  landings          Landing[]
+  trackingSessions  TrackingSession[]
+  conversionEvents  ConversionEvent[]
 
   @@map("bots")
 }
@@ -72,6 +81,7 @@ model Lead {
   currentFlow   Flow?   @relation("LeadCurrentFlow", fields: [currentFlowId], references: [id])
   broadcastLogs BroadcastLog[]
   messages      Message[]
+  trackingSessions TrackingSession[]
 
   @@unique([botId, telegramId])
   @@index([botId, status])
@@ -93,6 +103,93 @@ enum MessageKind {
   document
   sticker
   other
+}
+
+model Landing {
+  id          String   @id @default(cuid())
+  botId       String
+  slug        String   // /l/<slug>
+  name        String
+  title       String   @default("Acesse nosso bot")
+  subtitle    String?
+  ctaText     String   @default("Acessar agora")
+  flowId      String?  // optional: triggers this flow on /start (else welcome flow)
+  brokerUrl   String?  // we append ?ref=<sessionId> to attribute registration
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  bot      Bot               @relation(fields: [botId], references: [id], onDelete: Cascade)
+  flow     Flow?             @relation("LandingFlow", fields: [flowId], references: [id])
+  sessions TrackingSession[]
+
+  @@unique([botId, slug])
+  @@index([botId])
+  @@map("landings")
+}
+
+model TrackingSession {
+  id            String    @id @default(cuid())
+  botId         String
+  landingId     String?
+  // Click metadata (from URL + cookies)
+  fbclid        String?
+  fbp           String?
+  fbc           String?
+  utmSource     String?
+  utmMedium     String?
+  utmCampaign   String?
+  utmContent    String?
+  utmTerm       String?
+  ip            String?
+  userAgent     String?
+  // Conversion timeline
+  pageViewAt    DateTime  @default(now())
+  leadAt        DateTime?
+  registeredAt  DateTime?
+  depositedAt   DateTime?
+  depositValue  Float?
+  // Linked entities
+  leadId        String?
+  brokerUserId  String?
+  brokerEmail   String?
+
+  bot     Bot               @relation(fields: [botId], references: [id], onDelete: Cascade)
+  landing Landing?          @relation(fields: [landingId], references: [id], onDelete: SetNull)
+  lead    Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  events  ConversionEvent[]
+
+  @@index([botId, pageViewAt])
+  @@index([landingId])
+  @@index([leadId])
+  @@map("tracking_sessions")
+}
+
+enum ConversionEventType {
+  PageView
+  Lead
+  CompleteRegistration
+  Purchase
+  Custom
+}
+
+model ConversionEvent {
+  id         String              @id @default(cuid())
+  sessionId  String
+  botId      String
+  type       ConversionEventType
+  value      Float?
+  currency   String?
+  ok         Boolean             @default(true)
+  response   Json?
+  createdAt  DateTime            @default(now())
+
+  session TrackingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  bot     Bot             @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([botId, createdAt])
+  @@map("conversion_events")
 }
 
 model Message {
@@ -128,6 +225,7 @@ model Flow {
   steps        FlowStep[]
   welcomeForBots Bot[]      @relation("WelcomeFlow")
   leadsHere    Lead[]       @relation("LeadCurrentFlow")
+  landings     Landing[]    @relation("LandingFlow")
 
   @@index([botId])
   @@map("flows")
