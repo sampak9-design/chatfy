@@ -216,6 +216,7 @@ model Message {
   text       String?
   mediaUrl   String?          // for outgoing: the URL we sent. For incoming: not stored (Telegram file_id stored instead).
   fileId     String?          // Telegram file_id for incoming media (so we can re-fetch later if needed)
+  buttons    Json?            // [[{ text, url|callback_data }, ...], ...] — Telegram inline keyboard layout we sent
   fromAdmin  Boolean          @default(false) // outgoing: true if sent manually from inbox, false if from flow/broadcast
   createdAt  DateTime         @default(now())
 

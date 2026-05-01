@@ -221,6 +221,10 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
                   : m.fileId
                     ? `/api/tg-file/${bot.id}/${m.fileId}`
                     : null;
+                // Inline keyboard rows we sent to Telegram: [[ {text, url|callback_data}, ...], ...]
+                const buttonRows = Array.isArray(m.buttons)
+                  ? (m.buttons as { text: string; url?: string; callback_data?: string }[][])
+                  : null;
                 return (
                   <div key={m.id} className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
                     <div
@@ -249,11 +253,46 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
                           📎 Baixar documento
                         </a>
                       )}
-                      {!src && m.kind !== "text" && (
+                      {src && m.kind === "sticker" && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={src} alt="sticker" style={{ width: 120, height: 120, objectFit: "contain" }} />
+                      )}
+                      {!src && (m.kind === "other" || (m.kind !== "text" && !m.fileId && !m.mediaUrl)) && (
                         <div className="text-[11px] uppercase tracking-wide opacity-70">[{m.kind}]</div>
                       )}
                       {m.text && (
                         <div className="text-sm whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: m.text }} />
+                      )}
+                      {buttonRows && buttonRows.length > 0 && (
+                        <div className="space-y-1 pt-1" style={{ marginTop: 6 }}>
+                          {buttonRows.map((row, ri) => (
+                            <div key={ri} className="flex gap-1">
+                              {row.map((b, bi) => (
+                                b.url ? (
+                                  <a
+                                    key={bi}
+                                    href={b.url}
+                                    target="_blank"
+                                    rel="noopener"
+                                    className="flex-1 text-center px-2 py-1.5 rounded text-xs underline"
+                                    style={{ background: "rgba(0,0,0,0.25)", color: isOut && m.fromAdmin ? "white" : "var(--text)" }}
+                                  >
+                                    🔗 {b.text}
+                                  </a>
+                                ) : (
+                                  <span
+                                    key={bi}
+                                    className="flex-1 text-center px-2 py-1.5 rounded text-xs"
+                                    style={{ background: "rgba(0,0,0,0.25)", color: isOut && m.fromAdmin ? "rgba(255,255,255,0.85)" : "var(--text-dim)" }}
+                                    title="Botão de callback (continua o fluxo)"
+                                  >
+                                    ⏭ {b.text}
+                                  </span>
+                                )
+                              ))}
+                            </div>
+                          ))}
+                        </div>
                       )}
                       <div className="text-[10px] opacity-60 text-right">
                         {fmtTime(m.createdAt)}

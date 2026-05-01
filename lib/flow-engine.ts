@@ -88,6 +88,7 @@ export async function runFlowFrom(bot: Bot, lead: Lead, startStepId: string) {
           kind,
           text: rendered ?? null,
           mediaUrl: step.mediaUrl ?? null,
+          buttons: buttons ? (buttons as object) : undefined,
           fromAdmin: false,
         },
       });

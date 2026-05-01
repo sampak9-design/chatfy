@@ -67,6 +67,7 @@ const worker = new Worker<BroadcastJob>(
             kind,
             text: rendered ?? null,
             mediaUrl: broadcast.mediaUrl ?? null,
+            buttons: (broadcast.buttons as object) ?? undefined,
             fromAdmin: false,
           },
         }),
