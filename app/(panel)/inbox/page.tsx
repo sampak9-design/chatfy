@@ -5,6 +5,7 @@ import Link from "next/link";
 import { MessageSquare, Send } from "lucide-react";
 import { tgSend } from "@/lib/telegram";
 import { renderTemplate } from "@/lib/template";
+import { ScrollToBottom } from "@/components/ScrollToBottom";
 
 export const dynamic = "force-dynamic";
 
@@ -303,6 +304,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
                   </div>
                 );
               })}
+              <ScrollToBottom dep={activeLead.id} />
             </div>
 
             <form action={sendReply} className="p-4 flex gap-2" style={{ borderTop: "1px solid var(--border)", background: "var(--surface)" }}>
