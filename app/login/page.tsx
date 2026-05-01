@@ -37,7 +37,7 @@ export default async function LoginPage({
             <LogIn className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold">Chatfy</h1>
+            <h1 className="text-xl font-semibold">VSChat</h1>
             <p className="text-xs" style={{ color: "var(--text-dim)" }}>
               Painel administrativo
             </p>

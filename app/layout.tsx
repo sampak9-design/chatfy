@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Chatfy — Telegram Bot Manager",
+  title: "VSChat — Telegram Bot Manager",
   description: "Capture leads, build flows, broadcast — all from one panel.",
 };
 

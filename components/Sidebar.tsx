@@ -27,7 +27,7 @@ export function Sidebar({ adminEmail }: { adminEmail?: string }) {
           <Bot className="w-5 h-5 text-white" />
         </div>
         <div>
-          <div className="font-semibold leading-tight">Chatfy</div>
+          <div className="font-semibold leading-tight">VSChat</div>
           <div className="text-[11px]" style={{ color: "var(--text-faint)" }}>Telegram bot manager</div>
         </div>
       </div>
