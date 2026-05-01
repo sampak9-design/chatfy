@@ -36,11 +36,42 @@ async function regeneratePostbackSecret(formData: FormData) {
 async function createLanding(formData: FormData) {
   "use server";
   const botId = String(formData.get("botId"));
-  const slug = String(formData.get("slug") || "").trim().toLowerCase().replace(/[^a-z0-9-]/g, "-");
-  const name = String(formData.get("name") || "").trim();
-  if (!slug || !name) return;
+  const siteUrlRaw = String(formData.get("siteUrl") || "").trim();
+  const customName = String(formData.get("name") || "").trim();
+  if (!siteUrlRaw && !customName) return;
+
+  // Try to parse as URL — accept both with and without protocol.
+  let siteUrl: string | null = null;
+  let host = "";
+  try {
+    const u = new URL(siteUrlRaw.startsWith("http") ? siteUrlRaw : `https://${siteUrlRaw}`);
+    siteUrl = u.toString().replace(/\/$/, "");
+    host = u.host;
+  } catch {
+    siteUrl = null;
+    host = siteUrlRaw;
+  }
+
+  const name = customName || host || "Nova landing";
+  // Slug = host with dots and slashes turned into dashes; if no host, fallback to a sanitized name.
+  let slug = (host || name)
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40);
+  if (!slug) slug = `l-${Date.now().toString(36)}`;
+
+  // Ensure uniqueness within the bot — append -2, -3 if needed.
+  let finalSlug = slug;
+  let i = 2;
+  while (await prisma.landing.findFirst({ where: { botId, slug: finalSlug }, select: { id: true } })) {
+    finalSlug = `${slug}-${i++}`;
+    if (i > 50) break;
+  }
+
   const landing = await prisma.landing.create({
-    data: { botId, slug, name, title: name },
+    data: { botId, slug: finalSlug, name, title: name, siteUrl },
   });
   revalidatePath("/funnels");
   redirect(`/funnels/${landing.id}`);
@@ -166,11 +197,21 @@ export default async function FunnelsPage() {
           Cada landing tem uma URL pública (<code>/l/&lt;slug&gt;</code>) que você cola no anúncio do Facebook. Quando o lead clica e entra no Telegram, o funil é rastreado automaticamente.
         </p>
 
-        <form action={createLanding} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <form action={createLanding} className="space-y-3">
           <input type="hidden" name="botId" value={bot.id} />
-          <input name="name" required className="input" placeholder="Nome (ex: Apollo Black Friday)" />
-          <input name="slug" required className="input" placeholder="slug-da-url" />
-          <button className="btn btn-primary"><Plus className="w-4 h-4" /> Criar landing</button>
+          <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-3">
+            <input
+              name="siteUrl"
+              required
+              className="input"
+              placeholder="URL da sua landing (ex: pg.apollooficial.com)"
+            />
+            <input name="name" className="input" placeholder="Apelido (opcional)" />
+            <button className="btn btn-primary"><Plus className="w-4 h-4" /> Adicionar</button>
+          </div>
+          <p className="text-[11px]" style={{ color: "var(--text-faint)" }}>
+            Cole sua URL existente (com ou sem <code>https://</code>) — nome e slug são gerados automaticamente. Se ainda não tem landing, deixa só com apelido (ex: &quot;Black Friday&quot;) e use a URL <code>/l/&lt;slug&gt;</code> que aparecer.
+          </p>
         </form>
 
         <div className="space-y-2">
@@ -178,12 +219,14 @@ export default async function FunnelsPage() {
             <div key={l.id} className="flex items-center gap-3 px-3 py-3 rounded-lg" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
               <Link href={`/funnels/${l.id}`} className="flex-1 min-w-0">
                 <div className="font-medium truncate">{l.name}</div>
-                <div className="text-xs flex items-center gap-1" style={{ color: "var(--text-faint)" }}>
-                  <ExternalLink className="w-3 h-3" /> /l/{l.slug}
+                <div className="text-xs flex items-center gap-1 flex-wrap" style={{ color: "var(--text-faint)" }}>
+                  <ExternalLink className="w-3 h-3" />
+                  {l.siteUrl ? <span className="truncate">{l.siteUrl}</span> : <span>/l/{l.slug}</span>}
+                  <span className="opacity-50">· slug: <code>{l.slug}</code></span>
                   {!l.active && <span className="pill pill-muted ml-2">inativo</span>}
                 </div>
               </Link>
-              <CopyFlowLink url={`${appUrl}/l/${l.slug}`} compact />
+              <CopyFlowLink url={l.siteUrl || `${appUrl}/l/${l.slug}`} compact />
               <form action={deleteLanding}>
                 <input type="hidden" name="id" value={l.id} />
                 <button className="btn btn-danger text-xs" style={{ padding: "4px 10px" }}><Trash2 className="w-3.5 h-3.5" /></button>

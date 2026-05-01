@@ -17,11 +17,20 @@ async function saveLanding(formData: FormData) {
   const ctaText = String(formData.get("ctaText") || "Acessar").trim();
   const flowId = String(formData.get("flowId") || "") || null;
   const brokerUrl = String(formData.get("brokerUrl") || "").trim() || null;
+  const siteUrlRaw = String(formData.get("siteUrl") || "").trim();
+  let siteUrl: string | null = null;
+  if (siteUrlRaw) {
+    try {
+      siteUrl = new URL(siteUrlRaw.startsWith("http") ? siteUrlRaw : `https://${siteUrlRaw}`).toString().replace(/\/$/, "");
+    } catch {
+      siteUrl = siteUrlRaw;
+    }
+  }
   const active = formData.get("active") === "on";
 
   await prisma.landing.update({
     where: { id },
-    data: { name, title, subtitle, ctaText, flowId, brokerUrl, active },
+    data: { name, title, subtitle, ctaText, flowId, brokerUrl, siteUrl, active },
   });
   revalidatePath(`/funnels/${id}`);
   redirect(`/funnels/${id}`);
@@ -135,6 +144,13 @@ export default async function LandingDetail({ params }: { params: Promise<{ id: 
               {flows.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </div>
+        </div>
+        <div>
+          <label className="label">URL da sua landing externa (opcional)</label>
+          <input name="siteUrl" defaultValue={landing.siteUrl || ""} className="input" placeholder="https://pg.apollooficial.com" />
+          <p className="text-[11px] mt-1" style={{ color: "var(--text-faint)" }}>
+            Se você usa uma landing própria, cola a URL aqui. O botão &quot;Copiar link&quot; dessa landing vai copiar essa URL em vez de <code>/l/{landing.slug}</code>.
+          </p>
         </div>
         <div>
           <label className="label">URL da corretora (cadastro)</label>

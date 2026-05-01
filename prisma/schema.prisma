@@ -123,13 +123,14 @@ enum MessageKind {
 model Landing {
   id          String   @id @default(cuid())
   botId       String
-  slug        String   // /l/<slug>
+  slug        String   // /l/<slug>  (unique key inside the bot)
   name        String
   title       String   @default("Acesse nosso bot")
   subtitle    String?
   ctaText     String   @default("Acessar agora")
   flowId      String?  // optional: triggers this flow on /start (else welcome flow)
   brokerUrl   String?  // we append ?ref=<sessionId> to attribute registration
+  siteUrl     String?  // optional: user's own external landing URL (e.g. https://pg.apollooficial.com)
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
