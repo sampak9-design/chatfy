@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ExternalLink, Plus, Trash2, Filter as FunnelIcon, Settings as SettingsIcon } from "lucide-react";
 import { CopyFlowLink } from "@/components/CopyFlowLink";
+import { EmbedSnippet } from "@/components/EmbedSnippet";
 import { nanoid } from "nanoid";
 
 export const dynamic = "force-dynamic";
@@ -126,6 +127,15 @@ export default async function FunnelsPage() {
         </div>
         <button type="submit" className="btn btn-primary">Salvar</button>
       </form>
+
+      {/* Embed snippet for external landings */}
+      <div className="card p-6 space-y-4">
+        <h2 className="font-semibold">Sua landing externa? Cole este snippet</h2>
+        <p className="text-xs" style={{ color: "var(--text-dim)" }}>
+          Se você já tem uma landing page sua (em qualquer site/hospedagem), use este snippet em vez de criar uma landing aqui. Ele lê os cookies _fbp/_fbc, captura UTMs e fbclid, e redireciona pro bot quando o usuário clica no CTA.
+        </p>
+        <EmbedSnippet appUrl={appUrl} landings={landings.map((l) => ({ id: l.id, slug: l.slug, name: l.name }))} />
+      </div>
 
       {/* Postback URLs */}
       <div className="card p-6 space-y-4">
