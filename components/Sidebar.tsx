@@ -22,9 +22,9 @@ export function Sidebar({ adminEmail }: { adminEmail?: string }) {
       className="w-60 shrink-0 flex flex-col h-screen sticky top-0"
       style={{ background: "var(--surface)", borderRight: "1px solid var(--border)" }}
     >
-      <div className="p-4 flex items-center justify-center" style={{ borderBottom: "1px solid var(--border)" }}>
+      <div className="px-2 py-3 flex items-center justify-center" style={{ borderBottom: "1px solid var(--border)" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="VSChat" className="h-12 w-auto object-contain" />
+        <img src="/logo.png" alt="VSChat" className="w-full h-auto object-contain" style={{ maxHeight: 110 }} />
       </div>
 
       <nav className="flex-1 p-3 space-y-1">
