@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getSession, loginWithCredentials } from "@/lib/auth";
-import { LogIn } from "lucide-react";
 
 export default async function LoginPage({
   searchParams,
@@ -29,14 +28,10 @@ export default async function LoginPage({
         className="card w-full max-w-md p-8 space-y-5"
         style={{ background: "var(--surface)" }}
       >
-        <div className="flex items-center gap-3 mb-2">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: "var(--primary)" }}
-          >
-            <LogIn className="w-5 h-5 text-white" />
-          </div>
-          <div>
+        <div className="flex flex-col items-center gap-3 mb-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="VSChat" className="w-20 h-20 object-contain" />
+          <div className="text-center">
             <h1 className="text-xl font-semibold">VSChat</h1>
             <p className="text-xs" style={{ color: "var(--text-dim)" }}>
               Painel administrativo

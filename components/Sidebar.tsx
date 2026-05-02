@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Workflow, Megaphone, Settings, LogOut, Bot, MessageSquare, Filter, Activity } from "lucide-react";
+import { LayoutDashboard, Users, Workflow, Megaphone, Settings, LogOut, MessageSquare, Filter, Activity } from "lucide-react";
 
 const items = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -23,9 +23,8 @@ export function Sidebar({ adminEmail }: { adminEmail?: string }) {
       style={{ background: "var(--surface)", borderRight: "1px solid var(--border)" }}
     >
       <div className="p-5 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border)" }}>
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "var(--primary)" }}>
-          <Bot className="w-5 h-5 text-white" />
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="VSChat" className="w-10 h-10 object-contain" />
         <div>
           <div className="font-semibold leading-tight">VSChat</div>
           <div className="text-[11px]" style={{ color: "var(--text-faint)" }}>Telegram bot manager</div>
