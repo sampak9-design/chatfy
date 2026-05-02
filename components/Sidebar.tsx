@@ -23,15 +23,15 @@ export function Sidebar({ adminEmail }: { adminEmail?: string }) {
       style={{ background: "var(--surface)", borderRight: "1px solid var(--border)" }}
     >
       <div
-        className="flex items-center justify-center overflow-hidden"
-        style={{ borderBottom: "1px solid var(--border)", height: 90 }}
+        className="flex items-center justify-center overflow-hidden px-3 py-2"
+        style={{ borderBottom: "1px solid var(--border)", height: 100 }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/logo.png"
           alt="VSChat"
           className="object-contain"
-          style={{ width: "100%", height: "auto", transform: "scale(1.7)", transformOrigin: "center" }}
+          style={{ width: "100%", height: "auto", transform: "scale(1.45)", transformOrigin: "center" }}
         />
       </div>
 
