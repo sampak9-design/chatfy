@@ -36,9 +36,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/lib ./lib
 COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
-# Install prisma CLI (so its transitive deps like 'effect' are present) and tsx
-# (so `npm run worker` can run the TypeScript worker without a build step).
-RUN npm install --omit=dev --no-audit --no-fund prisma@^6.19.3 tsx@^4.19.2 \
+# Install tsx GLOBALLY so it's always on PATH (npm-run-script PATH munging is
+# flaky with Next.js standalone's node_modules layout). Also install prisma CLI
+# locally for db push + its transitive deps (effect, etc).
+RUN npm install -g --no-audit --no-fund tsx@^4.19.2 \
+    && npm install --omit=dev --no-audit --no-fund prisma@^6.19.3 \
     && chown -R nextjs:nodejs node_modules
 
 USER nextjs
