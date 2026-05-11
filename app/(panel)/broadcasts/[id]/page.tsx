@@ -6,6 +6,7 @@ import { ArrowLeft, Send, Save, Calendar, X, StopCircle, Trash2 } from "lucide-r
 import { getBroadcastQueue } from "@/lib/queue/broadcast-queue";
 import { ButtonsEditorClient } from "@/components/BroadcastButtonsEditor";
 import { LocalTime } from "@/components/LocalTime";
+import { SavedToast } from "@/components/Toast";
 import type { StepType, LeadStatus, LeadOrigin } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -65,6 +66,7 @@ async function saveDraft(formData: FormData) {
   });
 
   revalidatePath(`/broadcasts/${id}`);
+  redirect(`/broadcasts/${id}?saved=1`);
 }
 
 async function sendBroadcast(formData: FormData) {
@@ -206,8 +208,15 @@ async function deleteBroadcastAction(formData: FormData) {
   redirect("/broadcasts");
 }
 
-export default async function BroadcastDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function BroadcastDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ saved?: string }>;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
   const b = await prisma.broadcast.findUnique({ where: { id } });
   if (!b) notFound();
 
@@ -221,6 +230,7 @@ export default async function BroadcastDetailPage({ params }: { params: Promise<
 
   return (
     <div className="p-4 md:p-8 max-w-3xl space-y-5">
+      {sp.saved && <SavedToast message="Rascunho salvo!" />}
       <div className="flex items-center gap-3 flex-wrap">
         <Link href="/broadcasts" className="btn btn-ghost" style={{ padding: "6px 10px" }}><ArrowLeft className="w-4 h-4" /></Link>
         <h1 className="text-2xl font-semibold flex-1 min-w-0 truncate">{b.name}</h1>
