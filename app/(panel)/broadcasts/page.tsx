@@ -3,7 +3,7 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Megaphone, Plus, Trash2, StopCircle } from "lucide-react";
-import { getBroadcastQueue } from "@/lib/queue/broadcast-queue";
+import { requestCancel } from "@/lib/broadcast-runner";
 import { LocalTime } from "@/components/LocalTime";
 
 export const dynamic = "force-dynamic";
@@ -11,13 +11,7 @@ export const dynamic = "force-dynamic";
 async function deleteBroadcastFromList(formData: FormData) {
   "use server";
   const id = String(formData.get("id"));
-  try {
-    const queue = getBroadcastQueue();
-    const jobs = await queue.getJobs(["delayed", "waiting", "prioritized", "paused", "active"]);
-    await Promise.all(
-      jobs.filter((j) => j.data.broadcastId === id).map((j) => j.remove().catch(() => {})),
-    );
-  } catch (e) { console.error("[delete jobs]", e); }
+  requestCancel(id);
   await prisma.broadcast.delete({ where: { id } });
   revalidatePath("/broadcasts");
 }
@@ -27,13 +21,7 @@ async function stopFromList(formData: FormData) {
   const id = String(formData.get("id"));
   const b = await prisma.broadcast.findUnique({ where: { id } });
   if (!b || (b.status !== "sending" && b.status !== "scheduled")) return;
-  try {
-    const queue = getBroadcastQueue();
-    const jobs = await queue.getJobs(["delayed", "waiting", "prioritized", "paused"]);
-    await Promise.all(
-      jobs.filter((j) => j.data.broadcastId === id).map((j) => j.remove().catch(() => {})),
-    );
-  } catch (e) { console.error("[stop jobs]", e); }
+  requestCancel(id);
   await prisma.broadcast.update({
     where: { id },
     data: { status: "done", finishedAt: new Date() },

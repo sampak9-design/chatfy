@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { ArrowLeft, Send, Save, Calendar, X, StopCircle, Trash2 } from "lucide-react";
-import { getBroadcastQueue } from "@/lib/queue/broadcast-queue";
+import { startBroadcastRun, scheduleBroadcastRun, requestCancel } from "@/lib/broadcast-runner";
 import { ButtonsEditorClient } from "@/components/BroadcastButtonsEditor";
 import { LocalTime } from "@/components/LocalTime";
 import { SavedToast } from "@/components/Toast";
@@ -120,18 +120,16 @@ async function sendBroadcast(formData: FormData) {
     },
   });
 
-  const queue = getBroadcastQueue();
-  await queue.addBulk(
-    leads.map((l) => ({
-      name: "send",
-      data: { broadcastId: id, leadId: l.id },
-      opts: {
-        // BullMQ reserves ':' as a key separator in Redis — use '_' instead.
-        jobId: `${id}_${l.id}`,
-        ...(delayMs > 0 ? { delay: delayMs } : {}),
-      },
-    })),
-  );
+  // Also nuke any leftover logs from a previous run.
+  await prisma.broadcastLog.deleteMany({ where: { broadcastId: id } });
+
+  const leadIds = leads.map((l) => l.id);
+  if (scheduledFor) {
+    scheduleBroadcastRun(id, leadIds, scheduledFor);
+  } else {
+    startBroadcastRun(id, leadIds);
+  }
+  void delayMs; // unused now — kept variable for clarity
 
   revalidatePath(`/broadcasts/${id}`);
   redirect(`/broadcasts/${id}`);
@@ -142,16 +140,7 @@ async function cancelSchedule(formData: FormData) {
   const id = String(formData.get("id"));
   const broadcast = await prisma.broadcast.findUnique({ where: { id } });
   if (!broadcast || broadcast.status !== "scheduled") return;
-
-  // Remove all queued (delayed) jobs belonging to this broadcast.
-  const queue = getBroadcastQueue();
-  const jobs = await queue.getJobs(["delayed", "waiting"]);
-  await Promise.all(
-    jobs
-      .filter((j) => j.data.broadcastId === id)
-      .map((j) => j.remove().catch(() => {})),
-  );
-
+  requestCancel(id);
   await prisma.broadcast.update({
     where: { id },
     data: { status: "draft", scheduledFor: null, totalTargets: 0 },
@@ -165,20 +154,7 @@ async function stopBroadcast(formData: FormData) {
   const broadcast = await prisma.broadcast.findUnique({ where: { id } });
   if (!broadcast) return;
   if (broadcast.status !== "sending" && broadcast.status !== "scheduled") return;
-
-  // Cancel any pending jobs in Redis for this broadcast
-  try {
-    const queue = getBroadcastQueue();
-    const jobs = await queue.getJobs(["delayed", "waiting", "prioritized", "paused"]);
-    await Promise.all(
-      jobs
-        .filter((j) => j.data.broadcastId === id)
-        .map((j) => j.remove().catch(() => {})),
-    );
-  } catch (e) {
-    console.error("[stopBroadcast]", e);
-  }
-
+  requestCancel(id);
   await prisma.broadcast.update({
     where: { id },
     data: { status: "done", finishedAt: new Date() },
@@ -189,20 +165,7 @@ async function stopBroadcast(formData: FormData) {
 async function deleteBroadcastAction(formData: FormData) {
   "use server";
   const id = String(formData.get("id"));
-
-  // Cancel any pending jobs first
-  try {
-    const queue = getBroadcastQueue();
-    const jobs = await queue.getJobs(["delayed", "waiting", "prioritized", "paused", "active"]);
-    await Promise.all(
-      jobs
-        .filter((j) => j.data.broadcastId === id)
-        .map((j) => j.remove().catch(() => {})),
-    );
-  } catch (e) {
-    console.error("[deleteBroadcast]", e);
-  }
-
+  requestCancel(id);
   await prisma.broadcast.delete({ where: { id } });
   revalidatePath("/broadcasts");
   redirect("/broadcasts");
