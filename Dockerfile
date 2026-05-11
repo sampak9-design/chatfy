@@ -30,10 +30,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+# Copy source files needed by the worker process (tsx runs them directly).
+# Next standalone doesn't bundle these because the worker isn't part of the HTTP server.
+COPY --from=builder --chown=nextjs:nodejs /app/lib ./lib
+COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
-# Install prisma CLI here so all its transitive deps (effect, etc) are present.
-# Standalone tracing doesn't include CLI, only the runtime client.
-RUN npm install --omit=dev --no-audit --no-fund prisma@^6.19.3 \
+# Install prisma CLI (so its transitive deps like 'effect' are present) and tsx
+# (so `npm run worker` can run the TypeScript worker without a build step).
+RUN npm install --omit=dev --no-audit --no-fund prisma@^6.19.3 tsx@^4.19.2 \
     && chown -R nextjs:nodejs node_modules
 
 USER nextjs
