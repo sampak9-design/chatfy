@@ -12,12 +12,28 @@ export const dynamic = "force-dynamic";
 
 interface ButtonItem { id: string; label: string; url: string }
 
+function detectMediaTypeFromUrl(url: string): "image" | "video" | "audio" | "document" | null {
+  // Strip query string + hash, lowercase, check extension.
+  const lower = url.toLowerCase().split(/[?#]/)[0];
+  if (/\.(jpg|jpeg|png|webp|gif|bmp)$/.test(lower)) return "image";
+  if (/\.(mp4|mov|webm|avi|mkv|m4v)$/.test(lower)) return "video";
+  if (/\.(mp3|ogg|oga|m4a|wav|opus|aac)$/.test(lower)) return "audio";
+  if (/\.(pdf|zip|rar|doc|docx|xls|xlsx|csv|txt|7z)$/.test(lower)) return "document";
+  return null;
+}
+
 async function saveDraft(formData: FormData) {
   "use server";
   const id = String(formData.get("id"));
   const text = String(formData.get("text") || "");
   const mediaUrl = String(formData.get("mediaUrl") || "").trim() || null;
-  const mediaType = (String(formData.get("mediaType") || "") || null) as StepType | null;
+  let mediaType = (String(formData.get("mediaType") || "") || null) as StepType | null;
+
+  // Auto-detect type from URL extension if user pasted a URL but didn't pick the type.
+  if (mediaUrl && !mediaType) {
+    const detected = detectMediaTypeFromUrl(mediaUrl);
+    if (detected) mediaType = detected as StepType;
+  }
   const buttonsRaw = String(formData.get("buttons") || "[]");
 
   let buttons: ButtonItem[] = [];
