@@ -41,8 +41,8 @@ export default async function DashboardPage() {
 
   if (!bot) {
     return (
-      <div className="p-10">
-        <div className="card p-10 text-center max-w-2xl mx-auto">
+      <div className="p-4 md:p-10">
+        <div className="card p-6 md:p-10 text-center max-w-2xl mx-auto">
           <Bot className="w-12 h-12 mx-auto mb-3" style={{ color: "var(--primary)" }} />
           <h2 className="text-xl font-semibold mb-2">Vamos começar</h2>
           <p className="mb-6" style={{ color: "var(--text-dim)" }}>Cadastre seu primeiro bot do Telegram para começar a capturar leads.</p>
@@ -53,7 +53,7 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <p className="text-sm" style={{ color: "var(--text-dim)" }}>Bot: <span className="font-medium" style={{ color: "var(--text)" }}>{bot.name}</span> {bot.username && <>· @{bot.username}</>}</p>

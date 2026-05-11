@@ -84,7 +84,7 @@ export default async function LandingDetail({ params }: { params: Promise<{ id: 
   const r3 = registeredCount > 0 ? ((depositedCount / registeredCount) * 100).toFixed(1) : "0.0";
 
   return (
-    <div className="p-8 max-w-5xl space-y-6">
+    <div className="p-4 md:p-8 max-w-5xl space-y-6">
       <div className="flex items-center gap-3">
         <Link href="/funnels" className="btn btn-ghost" style={{ padding: "6px 10px" }}><ArrowLeft className="w-4 h-4" /></Link>
         <h1 className="text-2xl font-semibold">{landing.name}</h1>
@@ -169,7 +169,7 @@ export default async function LandingDetail({ params }: { params: Promise<{ id: 
       </form>
 
       {/* Recent sessions */}
-      <div className="card overflow-hidden">
+      <div className="card overflow-x-auto">
         <div className="px-5 py-3 font-semibold" style={{ borderBottom: "1px solid var(--border)" }}>Últimas sessões</div>
         <table className="w-full text-sm">
           <thead>
@@ -204,7 +204,7 @@ export default async function LandingDetail({ params }: { params: Promise<{ id: 
       </div>
 
       {/* Recent CAPI events */}
-      <div className="card overflow-hidden">
+      <div className="card overflow-x-auto">
         <div className="px-5 py-3 font-semibold" style={{ borderBottom: "1px solid var(--border)" }}>Eventos CAPI recentes</div>
         <table className="w-full text-sm">
           <thead>

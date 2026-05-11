@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { MessageSquare, Send } from "lucide-react";
+import { MessageSquare, Send, ArrowLeft } from "lucide-react";
 import { tgSend } from "@/lib/telegram";
 import { renderTemplate } from "@/lib/template";
 import { ScrollToBottom } from "@/components/ScrollToBottom";
@@ -77,7 +77,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const bot = await prisma.bot.findFirst({ orderBy: { createdAt: "asc" } });
   if (!bot) {
     return (
-      <div className="p-8">
+      <div className="p-4 md:p-8">
         <h1 className="text-2xl font-semibold mb-2">Conversas</h1>
         <p style={{ color: "var(--text-dim)" }}>Cadastre um bot primeiro em <Link href="/bot" style={{ color: "var(--primary)" }}>Bot</Link>.</p>
       </div>
@@ -116,10 +116,18 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       })
     : [];
 
+  // On mobile we show EITHER the list OR the chat based on the URL `?lead=` param.
+  // On desktop both panes are always visible.
+  const showListClass = sp.lead ? "hidden md:flex" : "flex";
+  const showChatClass = sp.lead ? "flex" : "hidden md:flex";
+
   return (
-    <div className="flex h-screen min-h-0">
+    <div className="flex min-h-0 h-[calc(100vh-56px)] md:h-screen">
       {/* Conversation list */}
-      <div className="w-80 shrink-0 flex flex-col" style={{ background: "var(--surface)", borderRight: "1px solid var(--border)" }}>
+      <div
+        className={`w-full md:w-80 shrink-0 ${showListClass} flex-col`}
+        style={{ background: "var(--surface)", borderRight: "1px solid var(--border)" }}
+      >
         <div className="p-4" style={{ borderBottom: "1px solid var(--border)" }}>
           <div className="flex items-center gap-2 mb-3">
             <MessageSquare className="w-4 h-4" style={{ color: "var(--primary)" }} />
@@ -182,16 +190,23 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       </div>
 
       {/* Conversation view */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className={`flex-1 ${showChatClass} flex-col min-w-0`}>
         {!activeLead ? (
           <div className="flex-1 flex items-center justify-center text-sm" style={{ color: "var(--text-faint)" }}>
             Selecione uma conversa à esquerda.
           </div>
         ) : (
           <>
-            <header className="px-6 py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}>
+            <header className="px-4 md:px-6 py-3 md:py-4 flex items-center gap-3" style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}>
+              <Link
+                href={`/inbox${sp.q ? `?q=${encodeURIComponent(sp.q)}` : ""}`}
+                className="md:hidden p-1 -ml-1"
+                aria-label="Voltar"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
               <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold"
+                className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0"
                 style={{ background: "var(--surface-3)", color: "var(--text-dim)" }}
               >
                 {((activeLead.firstName || activeLead.username || "?")[0] || "?").toUpperCase()}
@@ -208,7 +223,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
               <span className={`pill ${activeLead.status === "active" ? "pill-success" : activeLead.status === "blocked" ? "pill-danger" : "pill-muted"}`}>{activeLead.status}</span>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-3" style={{ background: "var(--bg)" }}>
+            <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-3" style={{ background: "var(--bg)" }}>
               {messages.length === 0 ? (
                 <div className="text-center text-sm py-8" style={{ color: "var(--text-faint)" }}>
                   Nenhuma mensagem trocada ainda.

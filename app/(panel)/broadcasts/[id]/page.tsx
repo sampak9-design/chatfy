@@ -143,7 +143,7 @@ export default async function BroadcastDetailPage({ params }: { params: Promise<
   })();
 
   return (
-    <div className="p-8 max-w-3xl space-y-5">
+    <div className="p-4 md:p-8 max-w-3xl space-y-5">
       <div className="flex items-center gap-3">
         <Link href="/broadcasts" className="btn btn-ghost" style={{ padding: "6px 10px" }}><ArrowLeft className="w-4 h-4" /></Link>
         <h1 className="text-2xl font-semibold">{b.name}</h1>

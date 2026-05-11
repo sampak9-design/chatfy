@@ -23,7 +23,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const bot = await prisma.bot.findFirst({ orderBy: { createdAt: "asc" } });
   if (!bot) {
     return (
-      <div className="p-8">
+      <div className="p-4 md:p-8">
         <h1 className="text-2xl font-semibold mb-2">Leads</h1>
         <p style={{ color: "var(--text-dim)" }}>Cadastre um bot primeiro em <Link href="/bot" style={{ color: "var(--primary)" }}>Bot</Link>.</p>
       </div>
@@ -62,7 +62,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="p-8 space-y-5">
+    <div className="p-4 md:p-8 space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Leads</h1>
@@ -91,8 +91,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         <button className="btn btn-primary">Filtrar</button>
       </form>
 
-      <div className="card overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="card overflow-x-auto">
+        <table className="w-full text-sm" style={{ minWidth: 720 }}>
           <thead>
             <tr style={{ background: "var(--surface-2)", color: "var(--text-dim)" }}>
               <th className="text-left font-medium px-4 py-3">Nome</th>

@@ -68,7 +68,7 @@ export default async function BotPage() {
 
   if (!bot) {
     return (
-      <div className="p-8 max-w-2xl">
+      <div className="p-4 md:p-8 max-w-2xl">
         <h1 className="text-2xl font-semibold mb-1">Configurar bot</h1>
         <p className="text-sm mb-6" style={{ color: "var(--text-dim)" }}>Crie um bot com o @BotFather e cole o token aqui.</p>
 
@@ -89,7 +89,7 @@ export default async function BotPage() {
   }
 
   return (
-    <div className="p-8 max-w-3xl space-y-6">
+    <div className="p-4 md:p-8 max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Bot</h1>
         <p className="text-sm" style={{ color: "var(--text-dim)" }}>Configurações e webhook.</p>

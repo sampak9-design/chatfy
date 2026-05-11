@@ -15,7 +15,7 @@ const items = [
   { href: "/bot", label: "Bot", icon: Settings },
 ];
 
-export function Sidebar({ adminEmail }: { adminEmail?: string }) {
+export function Sidebar({ adminEmail, onNavigate }: { adminEmail?: string; onNavigate?: () => void }) {
   const pathname = usePathname();
   return (
     <aside
@@ -43,6 +43,7 @@ export function Sidebar({ adminEmail }: { adminEmail?: string }) {
             <Link
               key={it.href}
               href={it.href}
+              onClick={onNavigate}
               className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors"
               style={{
                 background: active ? "var(--surface-3)" : "transparent",

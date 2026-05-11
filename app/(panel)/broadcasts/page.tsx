@@ -27,7 +27,7 @@ export default async function BroadcastsPage() {
   const bot = await prisma.bot.findFirst({ orderBy: { createdAt: "asc" } });
   if (!bot) {
     return (
-      <div className="p-8">
+      <div className="p-4 md:p-8">
         <h1 className="text-2xl font-semibold mb-2">Disparos</h1>
         <p style={{ color: "var(--text-dim)" }}>Cadastre um bot primeiro em <Link href="/bot" style={{ color: "var(--primary)" }}>Bot</Link>.</p>
       </div>
@@ -36,7 +36,7 @@ export default async function BroadcastsPage() {
   const list = await prisma.broadcast.findMany({ where: { botId: bot.id }, orderBy: { createdAt: "desc" } });
 
   return (
-    <div className="p-8 space-y-5">
+    <div className="p-4 md:p-8 space-y-5">
       <h1 className="text-2xl font-semibold">Disparos</h1>
 
       <form action={createDraft} className="card p-4 flex gap-3">
@@ -44,8 +44,8 @@ export default async function BroadcastsPage() {
         <button className="btn btn-primary"><Plus className="w-4 h-4" /> Novo disparo</button>
       </form>
 
-      <div className="card overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="card overflow-x-auto">
+        <table className="w-full text-sm" style={{ minWidth: 720 }}>
           <thead>
             <tr style={{ background: "var(--surface-2)", color: "var(--text-dim)" }}>
               <th className="text-left font-medium px-4 py-3">Nome</th>

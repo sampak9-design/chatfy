@@ -171,7 +171,7 @@ function FunnelEditorInner(props: Props) {
   };
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-[calc(100vh-56px)] md:h-screen">
       <header className="flex items-center justify-between px-5 py-3" style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}>
         <div className="flex items-center gap-3 min-w-0">
           <Link href="/track" className="btn btn-ghost" style={{ padding: "6px 10px" }}>

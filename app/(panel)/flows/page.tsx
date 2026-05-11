@@ -36,7 +36,7 @@ export default async function FlowsPage() {
   const bot = await prisma.bot.findFirst({ orderBy: { createdAt: "asc" } });
   if (!bot) {
     return (
-      <div className="p-8">
+      <div className="p-4 md:p-8">
         <h1 className="text-2xl font-semibold mb-2">Fluxos</h1>
         <p style={{ color: "var(--text-dim)" }}>Cadastre um bot primeiro em <Link href="/bot" style={{ color: "var(--primary)" }}>Bot</Link>.</p>
       </div>
@@ -45,7 +45,7 @@ export default async function FlowsPage() {
   const flows = await prisma.flow.findMany({ where: { botId: bot.id }, orderBy: { updatedAt: "desc" } });
 
   return (
-    <div className="p-8 space-y-5">
+    <div className="p-4 md:p-8 space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Fluxos</h1>

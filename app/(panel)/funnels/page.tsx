@@ -88,7 +88,7 @@ export default async function FunnelsPage() {
   const bot = await prisma.bot.findFirst({ orderBy: { createdAt: "asc" } });
   if (!bot) {
     return (
-      <div className="p-8">
+      <div className="p-4 md:p-8">
         <h1 className="text-2xl font-semibold mb-2">Funil</h1>
         <p style={{ color: "var(--text-dim)" }}>Cadastre um bot primeiro em <Link href="/bot" style={{ color: "var(--primary)" }}>Bot</Link>.</p>
       </div>
@@ -112,7 +112,7 @@ export default async function FunnelsPage() {
   const postbackBase = `${appUrl}/api/track`;
 
   return (
-    <div className="p-8 space-y-6 max-w-5xl">
+    <div className="p-4 md:p-8 space-y-6 max-w-5xl">
       <div className="flex items-center gap-3">
         <FunnelIcon className="w-6 h-6" style={{ color: "var(--primary)" }} />
         <h1 className="text-2xl font-semibold">Funil &amp; Tracking</h1>
