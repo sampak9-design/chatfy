@@ -6,6 +6,7 @@ import { MessageSquare, Send, ArrowLeft } from "lucide-react";
 import { tgSend } from "@/lib/telegram";
 import { renderTemplate } from "@/lib/template";
 import { ScrollToBottom } from "@/components/ScrollToBottom";
+import { LocalTime } from "@/components/LocalTime";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +26,6 @@ function fmtRel(d: Date) {
   const days = Math.floor(h / 24);
   if (days < 7) return `${days}d`;
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(d);
-}
-
-function fmtTime(d: Date) {
-  return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(d);
 }
 
 async function sendReply(formData: FormData) {
@@ -311,7 +308,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
                         </div>
                       )}
                       <div className="text-[10px] opacity-60 text-right">
-                        {fmtTime(m.createdAt)}
+                        <LocalTime iso={m.createdAt.toISOString()} variant="timeOnly" />
                         {isOut && m.fromAdmin && " · admin"}
                         {isOut && !m.fromAdmin && " · bot"}
                       </div>

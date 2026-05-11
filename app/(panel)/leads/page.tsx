@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { LeadStatus, LeadOrigin } from "@prisma/client";
 import Link from "next/link";
+import { LocalTime } from "@/components/LocalTime";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +14,6 @@ interface SP {
 }
 
 const PAGE_SIZE = 25;
-
-function fmt(d: Date) {
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }).format(d);
-}
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
@@ -117,7 +114,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
                 <td className="px-4 py-3">
                   <span className={`pill ${l.status === "active" ? "pill-success" : l.status === "blocked" ? "pill-danger" : "pill-muted"}`}>{l.status}</span>
                 </td>
-                <td className="px-4 py-3" style={{ color: "var(--text-faint)" }}>{fmt(l.createdAt)}</td>
+                <td className="px-4 py-3" style={{ color: "var(--text-faint)" }}><LocalTime iso={l.createdAt.toISOString()} /></td>
               </tr>
             ))}
           </tbody>

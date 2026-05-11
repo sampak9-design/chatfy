@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Send, Save, Calendar, X, StopCircle, Trash2 } from "lucide-react";
 import { getBroadcastQueue } from "@/lib/queue/broadcast-queue";
 import { ButtonsEditorClient } from "@/components/BroadcastButtonsEditor";
+import { LocalTime } from "@/components/LocalTime";
 import type { StepType, LeadStatus, LeadOrigin } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -217,7 +218,7 @@ export default async function BroadcastDetailPage({ params }: { params: Promise<
               <Calendar className="w-5 h-5" />
             </div>
             <div className="flex-1">
-              <div className="font-medium">Agendado para {b.scheduledFor ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeStyle: "short" }).format(b.scheduledFor) : "—"}</div>
+              <div className="font-medium">Agendado para {b.scheduledFor ? <LocalTime iso={b.scheduledFor.toISOString()} variant="long" /> : "—"}</div>
               <div className="text-sm" style={{ color: "var(--text-dim)" }}>Alvo: {b.totalTargets} lead(s). O envio começa automaticamente no horário marcado.</div>
             </div>
           </div>

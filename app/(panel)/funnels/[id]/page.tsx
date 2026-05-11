@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save } from "lucide-react";
 import { CopyFlowLink } from "@/components/CopyFlowLink";
+import { LocalTime } from "@/components/LocalTime";
 
 export const dynamic = "force-dynamic";
 
@@ -186,7 +187,7 @@ export default async function LandingDetail({ params }: { params: Promise<{ id: 
               <tr><td colSpan={5} className="text-center py-6" style={{ color: "var(--text-faint)" }}>Nenhuma sessão ainda.</td></tr>
             ) : recentSessions.map((s) => (
               <tr key={s.id} style={{ borderTop: "1px solid var(--border)" }}>
-                <td className="px-4 py-2 text-xs" style={{ color: "var(--text-faint)" }}>{s.pageViewAt.toLocaleString("pt-BR")}</td>
+                <td className="px-4 py-2 text-xs" style={{ color: "var(--text-faint)" }}><LocalTime iso={s.pageViewAt.toISOString()} /></td>
                 <td className="px-4 py-2 text-xs" style={{ color: "var(--text-dim)" }}>
                   {[s.utmSource, s.utmCampaign].filter(Boolean).join(" · ") || "—"}
                 </td>
@@ -220,7 +221,7 @@ export default async function LandingDetail({ params }: { params: Promise<{ id: 
               <tr><td colSpan={4} className="text-center py-6" style={{ color: "var(--text-faint)" }}>Nenhum evento ainda.</td></tr>
             ) : recentEvents.map((e) => (
               <tr key={e.id} style={{ borderTop: "1px solid var(--border)" }}>
-                <td className="px-4 py-2 text-xs" style={{ color: "var(--text-faint)" }}>{e.createdAt.toLocaleString("pt-BR")}</td>
+                <td className="px-4 py-2 text-xs" style={{ color: "var(--text-faint)" }}><LocalTime iso={e.createdAt.toISOString()} /></td>
                 <td className="px-4 py-2"><span className="pill pill-info">{e.type}</span></td>
                 <td className="px-4 py-2 text-right">{e.value ? `${e.currency || "BRL"} ${e.value.toFixed(2)}` : "—"}</td>
                 <td className="px-4 py-2">

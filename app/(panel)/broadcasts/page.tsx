@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Megaphone, Plus, Trash2, StopCircle } from "lucide-react";
 import { getBroadcastQueue } from "@/lib/queue/broadcast-queue";
+import { LocalTime } from "@/components/LocalTime";
 
 export const dynamic = "force-dynamic";
 
@@ -51,10 +52,6 @@ async function createDraft(formData: FormData) {
   });
   revalidatePath("/broadcasts");
   redirect(`/broadcasts/${b.id}`);
-}
-
-function fmt(d: Date) {
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }).format(d);
 }
 
 export default async function BroadcastsPage() {
@@ -111,8 +108,8 @@ export default async function BroadcastsPage() {
                 <td className="px-4 py-3 text-right" style={{ color: "var(--success)" }}>{b.sentCount}</td>
                 <td className="px-4 py-3 text-right" style={{ color: "var(--danger)" }}>{b.failedCount}</td>
                 <td className="px-4 py-3 text-right" style={{ color: "var(--warning)" }}>{b.blockedCount}</td>
-                <td className="px-4 py-3 text-xs" style={{ color: "var(--text-dim)" }}>{b.scheduledFor ? fmt(b.scheduledFor) : "—"}</td>
-                <td className="px-4 py-3" style={{ color: "var(--text-faint)" }}>{fmt(b.createdAt)}</td>
+                <td className="px-4 py-3 text-xs" style={{ color: "var(--text-dim)" }}>{b.scheduledFor ? <LocalTime iso={b.scheduledFor.toISOString()} /> : "—"}</td>
+                <td className="px-4 py-3" style={{ color: "var(--text-faint)" }}><LocalTime iso={b.createdAt.toISOString()} /></td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-2">
                     {(b.status === "sending" || b.status === "scheduled") && (
