@@ -15,10 +15,20 @@ interface ButtonItem { id: string; label: string; url: string }
 function detectMediaTypeFromUrl(url: string): "image" | "video" | "audio" | "document" | null {
   // Strip query string + hash, lowercase, check extension.
   const lower = url.toLowerCase().split(/[?#]/)[0];
-  if (/\.(jpg|jpeg|png|webp|gif|bmp)$/.test(lower)) return "image";
+
+  // 1) File extension at end of path
+  if (/\.(jpg|jpeg|png|webp|gif|bmp|svg)$/.test(lower)) return "image";
   if (/\.(mp4|mov|webm|avi|mkv|m4v)$/.test(lower)) return "video";
   if (/\.(mp3|ogg|oga|m4a|wav|opus|aac)$/.test(lower)) return "audio";
   if (/\.(pdf|zip|rar|doc|docx|xls|xlsx|csv|txt|7z)$/.test(lower)) return "document";
+
+  // 2) Path hints used by Cloudinary / other media CDNs
+  //    e.g. https://res.cloudinary.com/<cloud>/image/upload/v123/public_id
+  if (/\/image\/|\/photos?\//.test(lower)) return "image";
+  if (/\/video\/|\/videos?\//.test(lower)) return "video";
+  if (/\/audio\/|\/sounds?\//.test(lower)) return "audio";
+  if (/\/raw\/|\/files?\//.test(lower)) return "document";
+
   return null;
 }
 
