@@ -33,7 +33,7 @@ async function saveDraft(formData: FormData) {
     data: {
       text: text || null,
       mediaUrl,
-      mediaType: mediaUrl ? mediaType : null,
+      mediaType,
       buttons: inlineRows.length > 0 ? inlineRows : undefined,
     },
   });
