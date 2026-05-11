@@ -97,7 +97,8 @@ async function sendBroadcast(formData: FormData) {
       name: "send",
       data: { broadcastId: id, leadId: l.id },
       opts: {
-        jobId: `${id}:${l.id}`,
+        // BullMQ reserves ':' as a key separator in Redis — use '_' instead.
+        jobId: `${id}_${l.id}`,
         ...(delayMs > 0 ? { delay: delayMs } : {}),
       },
     })),
