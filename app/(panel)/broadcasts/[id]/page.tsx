@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { ArrowLeft, Send, Save, Calendar, X } from "lucide-react";
+import { ArrowLeft, Send, Save, Calendar, X, StopCircle, Trash2 } from "lucide-react";
 import { getBroadcastQueue } from "@/lib/queue/broadcast-queue";
 import { ButtonsEditorClient } from "@/components/BroadcastButtonsEditor";
 import type { StepType, LeadStatus, LeadOrigin } from "@prisma/client";
@@ -130,6 +130,55 @@ async function cancelSchedule(formData: FormData) {
   revalidatePath(`/broadcasts/${id}`);
 }
 
+async function stopBroadcast(formData: FormData) {
+  "use server";
+  const id = String(formData.get("id"));
+  const broadcast = await prisma.broadcast.findUnique({ where: { id } });
+  if (!broadcast) return;
+  if (broadcast.status !== "sending" && broadcast.status !== "scheduled") return;
+
+  // Cancel any pending jobs in Redis for this broadcast
+  try {
+    const queue = getBroadcastQueue();
+    const jobs = await queue.getJobs(["delayed", "waiting", "prioritized", "paused"]);
+    await Promise.all(
+      jobs
+        .filter((j) => j.data.broadcastId === id)
+        .map((j) => j.remove().catch(() => {})),
+    );
+  } catch (e) {
+    console.error("[stopBroadcast]", e);
+  }
+
+  await prisma.broadcast.update({
+    where: { id },
+    data: { status: "done", finishedAt: new Date() },
+  });
+  revalidatePath(`/broadcasts/${id}`);
+}
+
+async function deleteBroadcastAction(formData: FormData) {
+  "use server";
+  const id = String(formData.get("id"));
+
+  // Cancel any pending jobs first
+  try {
+    const queue = getBroadcastQueue();
+    const jobs = await queue.getJobs(["delayed", "waiting", "prioritized", "paused", "active"]);
+    await Promise.all(
+      jobs
+        .filter((j) => j.data.broadcastId === id)
+        .map((j) => j.remove().catch(() => {})),
+    );
+  } catch (e) {
+    console.error("[deleteBroadcast]", e);
+  }
+
+  await prisma.broadcast.delete({ where: { id } });
+  revalidatePath("/broadcasts");
+  redirect("/broadcasts");
+}
+
 export default async function BroadcastDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const b = await prisma.broadcast.findUnique({ where: { id } });
@@ -145,10 +194,20 @@ export default async function BroadcastDetailPage({ params }: { params: Promise<
 
   return (
     <div className="p-4 md:p-8 max-w-3xl space-y-5">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Link href="/broadcasts" className="btn btn-ghost" style={{ padding: "6px 10px" }}><ArrowLeft className="w-4 h-4" /></Link>
-        <h1 className="text-2xl font-semibold">{b.name}</h1>
-        <span className={`pill ${b.status === "done" ? "pill-success" : b.status === "failed" ? "pill-danger" : b.status === "sending" ? "pill-warning" : "pill-muted"}`}>{b.status}</span>
+        <h1 className="text-2xl font-semibold flex-1 min-w-0 truncate">{b.name}</h1>
+        <span className={`pill ${b.status === "done" ? "pill-success" : b.status === "failed" ? "pill-danger" : b.status === "sending" ? "pill-warning" : b.status === "scheduled" ? "pill-info" : "pill-muted"}`}>{b.status}</span>
+        {b.status === "sending" && (
+          <form action={stopBroadcast}>
+            <input type="hidden" name="id" value={b.id} />
+            <button type="submit" className="btn btn-danger"><StopCircle className="w-4 h-4" /> Parar envio</button>
+          </form>
+        )}
+        <form action={deleteBroadcastAction}>
+          <input type="hidden" name="id" value={b.id} />
+          <button type="submit" className="btn btn-ghost" style={{ color: "var(--danger)" }}><Trash2 className="w-4 h-4" /> Excluir</button>
+        </form>
       </div>
 
       {isScheduled ? (

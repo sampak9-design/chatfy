@@ -2,9 +2,43 @@ import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { Megaphone, Plus } from "lucide-react";
+import { Megaphone, Plus, Trash2, StopCircle } from "lucide-react";
+import { getBroadcastQueue } from "@/lib/queue/broadcast-queue";
 
 export const dynamic = "force-dynamic";
+
+async function deleteBroadcastFromList(formData: FormData) {
+  "use server";
+  const id = String(formData.get("id"));
+  try {
+    const queue = getBroadcastQueue();
+    const jobs = await queue.getJobs(["delayed", "waiting", "prioritized", "paused", "active"]);
+    await Promise.all(
+      jobs.filter((j) => j.data.broadcastId === id).map((j) => j.remove().catch(() => {})),
+    );
+  } catch (e) { console.error("[delete jobs]", e); }
+  await prisma.broadcast.delete({ where: { id } });
+  revalidatePath("/broadcasts");
+}
+
+async function stopFromList(formData: FormData) {
+  "use server";
+  const id = String(formData.get("id"));
+  const b = await prisma.broadcast.findUnique({ where: { id } });
+  if (!b || (b.status !== "sending" && b.status !== "scheduled")) return;
+  try {
+    const queue = getBroadcastQueue();
+    const jobs = await queue.getJobs(["delayed", "waiting", "prioritized", "paused"]);
+    await Promise.all(
+      jobs.filter((j) => j.data.broadcastId === id).map((j) => j.remove().catch(() => {})),
+    );
+  } catch (e) { console.error("[stop jobs]", e); }
+  await prisma.broadcast.update({
+    where: { id },
+    data: { status: "done", finishedAt: new Date() },
+  });
+  revalidatePath("/broadcasts");
+}
 
 async function createDraft(formData: FormData) {
   "use server";
@@ -56,11 +90,12 @@ export default async function BroadcastsPage() {
               <th className="text-right font-medium px-4 py-3">Bloqueios</th>
               <th className="text-left font-medium px-4 py-3">Agendado</th>
               <th className="text-left font-medium px-4 py-3">Criado</th>
+              <th className="text-right font-medium px-4 py-3">Ações</th>
             </tr>
           </thead>
           <tbody>
             {list.length === 0 ? (
-              <tr><td colSpan={8} className="text-center py-10" style={{ color: "var(--text-faint)" }}>Nenhum disparo ainda.</td></tr>
+              <tr><td colSpan={9} className="text-center py-10" style={{ color: "var(--text-faint)" }}>Nenhum disparo ainda.</td></tr>
             ) : list.map((b) => (
               <tr key={b.id} style={{ borderTop: "1px solid var(--border)" }}>
                 <td className="px-4 py-3">
@@ -78,6 +113,24 @@ export default async function BroadcastsPage() {
                 <td className="px-4 py-3 text-right" style={{ color: "var(--warning)" }}>{b.blockedCount}</td>
                 <td className="px-4 py-3 text-xs" style={{ color: "var(--text-dim)" }}>{b.scheduledFor ? fmt(b.scheduledFor) : "—"}</td>
                 <td className="px-4 py-3" style={{ color: "var(--text-faint)" }}>{fmt(b.createdAt)}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-2">
+                    {(b.status === "sending" || b.status === "scheduled") && (
+                      <form action={stopFromList}>
+                        <input type="hidden" name="id" value={b.id} />
+                        <button type="submit" className="btn btn-ghost text-xs" style={{ padding: "4px 8px", color: "var(--warning)" }} title="Parar envio">
+                          <StopCircle className="w-3.5 h-3.5" />
+                        </button>
+                      </form>
+                    )}
+                    <form action={deleteBroadcastFromList}>
+                      <input type="hidden" name="id" value={b.id} />
+                      <button type="submit" className="btn btn-danger text-xs" style={{ padding: "4px 8px" }} title="Excluir">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </form>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
