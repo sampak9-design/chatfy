@@ -6,6 +6,8 @@ import { ExternalLink, Plus, Trash2, Filter as FunnelIcon, Settings as SettingsI
 import { CopyFlowLink } from "@/components/CopyFlowLink";
 import { EmbedSnippet } from "@/components/EmbedSnippet";
 import { nanoid } from "nanoid";
+import { getActiveBot } from "@/lib/active-bot";
+import { ConfirmDelete } from "@/components/ConfirmDelete";
 
 export const dynamic = "force-dynamic";
 
@@ -85,7 +87,7 @@ async function deleteLanding(formData: FormData) {
 }
 
 export default async function FunnelsPage() {
-  const bot = await prisma.bot.findFirst({ orderBy: { createdAt: "asc" } });
+  const bot = await getActiveBot();
   if (!bot) {
     return (
       <div className="p-4 md:p-8">
@@ -227,10 +229,13 @@ export default async function FunnelsPage() {
                 </div>
               </Link>
               <CopyFlowLink url={l.siteUrl || `${appUrl}/l/${l.slug}`} compact />
-              <form action={deleteLanding}>
-                <input type="hidden" name="id" value={l.id} />
-                <button className="btn btn-danger text-xs" style={{ padding: "4px 10px" }}><Trash2 className="w-3.5 h-3.5" /></button>
-              </form>
+              <ConfirmDelete
+                title={`Excluir landing "${l.name}"?`}
+                description="Vai apagar a landing e suas sessões de tracking."
+                formAction={deleteLanding}
+                hiddenFields={{ id: l.id }}
+                trigger={<Trash2 className="w-3.5 h-3.5" />}
+              />
             </div>
           ))}
           {landings.length === 0 && (

@@ -1,14 +1,29 @@
 import { prisma } from "@/lib/db";
 import { LeadStatus, LeadOrigin } from "@prisma/client";
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
 import { LocalTime } from "@/components/LocalTime";
+import { TagsEditor } from "@/components/TagsEditor";
+import { EmptyState } from "@/components/EmptyState";
+import { getActiveBot } from "@/lib/active-bot";
+import { Users } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+async function saveTags(formData: FormData) {
+  "use server";
+  const leadId = String(formData.get("leadId"));
+  const raw = String(formData.get("tags") || "");
+  const tags = raw.split(",").map((t) => t.trim()).filter(Boolean);
+  await prisma.lead.update({ where: { id: leadId }, data: { tags } });
+  revalidatePath("/leads");
+}
 
 interface SP {
   status?: string;
   origin?: string;
   source?: string;
+  tag?: string;
   q?: string;
   page?: string;
 }
@@ -17,7 +32,7 @@ const PAGE_SIZE = 25;
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
-  const bot = await prisma.bot.findFirst({ orderBy: { createdAt: "asc" } });
+  const bot = await getActiveBot();
   if (!bot) {
     return (
       <div className="p-4 md:p-8">
@@ -33,6 +48,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
     ...(sp.status && Object.values(LeadStatus).includes(sp.status as LeadStatus) ? { status: sp.status as LeadStatus } : {}),
     ...(sp.origin && Object.values(LeadOrigin).includes(sp.origin as LeadOrigin) ? { origin: sp.origin as LeadOrigin } : {}),
     ...(sp.source ? { source: sp.source } : {}),
+    ...(sp.tag ? { tags: { has: sp.tag } } : {}),
     ...(sp.q
       ? {
           OR: [
@@ -45,7 +61,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
       : {}),
   };
 
-  const [total, leads, sources] = await Promise.all([
+  const [total, leads, sources, tagAgg] = await Promise.all([
     prisma.lead.count({ where }),
     prisma.lead.findMany({ where, orderBy: { createdAt: "desc" }, take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE }),
     prisma.lead.findMany({
@@ -54,7 +70,13 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
       select: { source: true },
       take: 100,
     }),
+    prisma.lead.findMany({
+      where: { botId: bot.id },
+      select: { tags: true },
+      take: 5000,
+    }),
   ]);
+  const allTags = Array.from(new Set(tagAgg.flatMap((l) => l.tags))).sort();
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -67,8 +89,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         </div>
       </div>
 
-      <form className="card p-4 grid grid-cols-1 md:grid-cols-5 gap-3" method="get">
-        <input name="q" defaultValue={sp.q || ""} className="input" placeholder="Nome, username ou telegram_id" />
+      <form className="card p-4 grid grid-cols-1 md:grid-cols-6 gap-3" method="get">
+        <input name="q" defaultValue={sp.q || ""} className="input md:col-span-2" placeholder="Nome, username ou telegram_id" />
         <select name="status" defaultValue={sp.status || ""} className="input">
           <option value="">Todos os status</option>
           <option value="active">Ativos</option>
@@ -82,10 +104,14 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           <option value="campaign">Campanha</option>
         </select>
         <select name="source" defaultValue={sp.source || ""} className="input">
-          <option value="">Toda fonte (?start=)</option>
+          <option value="">Toda fonte</option>
           {sources.map((s) => s.source && <option key={s.source} value={s.source}>{s.source}</option>)}
         </select>
-        <button className="btn btn-primary">Filtrar</button>
+        <select name="tag" defaultValue={sp.tag || ""} className="input">
+          <option value="">Toda tag</option>
+          {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <button className="btn btn-primary md:col-span-6">Filtrar</button>
       </form>
 
       <div className="card overflow-x-auto">
@@ -98,12 +124,20 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
               <th className="text-left font-medium px-4 py-3">Origem</th>
               <th className="text-left font-medium px-4 py-3">Fonte</th>
               <th className="text-left font-medium px-4 py-3">Status</th>
+              <th className="text-left font-medium px-4 py-3">Tags</th>
               <th className="text-left font-medium px-4 py-3">Entrou</th>
             </tr>
           </thead>
           <tbody>
             {leads.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-10" style={{ color: "var(--text-faint)" }}>Nenhum lead encontrado.</td></tr>
+              <tr><td colSpan={8} className="p-0">
+                <EmptyState
+                  icon={Users}
+                  title="Nenhum lead encontrado"
+                  description="Compartilhe o link do seu bot pra começar a captar."
+                  small
+                />
+              </td></tr>
             ) : leads.map((l) => (
               <tr key={l.id} style={{ borderTop: "1px solid var(--border)" }}>
                 <td className="px-4 py-3">{[l.firstName, l.lastName].filter(Boolean).join(" ") || "—"}</td>
@@ -113,6 +147,9 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
                 <td className="px-4 py-3 text-xs" style={{ color: "var(--text-dim)" }}>{l.source || "—"}</td>
                 <td className="px-4 py-3">
                   <span className={`pill ${l.status === "active" ? "pill-success" : l.status === "blocked" ? "pill-danger" : "pill-muted"}`}>{l.status}</span>
+                </td>
+                <td className="px-4 py-3" style={{ minWidth: 200 }}>
+                  <TagsEditor leadId={l.id} initialTags={l.tags} saveAction={saveTags} />
                 </td>
                 <td className="px-4 py-3" style={{ color: "var(--text-faint)" }}><LocalTime iso={l.createdAt.toISOString()} /></td>
               </tr>

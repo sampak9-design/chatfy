@@ -19,13 +19,21 @@ model AdminUser {
   @@map("admin_users")
 }
 
+enum BotChannel {
+  telegram
+  whatsapp
+  instagram
+}
+
 model Bot {
-  id              String   @id @default(cuid())
+  id              String     @id @default(cuid())
   name            String
-  token           String   @unique
+  token           String     @unique
   username        String?
+  channel         BotChannel @default(telegram)
   welcomeFlowId   String?
-  active          Boolean  @default(true)
+  active          Boolean    @default(true)
+  paused          Boolean    @default(false)
   webhookSecret   String
   // Meta Conversions API (Facebook Ads)
   metaPixelId     String?
@@ -85,6 +93,7 @@ model Lead {
   status         LeadStatus @default(active)
   origin         LeadOrigin @default(start)
   source         String?    // free-form tracking from /start <param>, e.g. "fb_ad_campaign_1"
+  tags           String[]   @default([])  // free-form labels you set: ['vip', 'comprou', 'lead_frio']
   languageCode   String?
   currentFlowId  String?
   currentStepId  String?

@@ -3,6 +3,9 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Activity, Plus, Trash2 } from "lucide-react";
+import { getActiveBot } from "@/lib/active-bot";
+import { EmptyState } from "@/components/EmptyState";
+import { ConfirmDelete } from "@/components/ConfirmDelete";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +13,7 @@ async function createFunnel(formData: FormData) {
   "use server";
   const name = String(formData.get("name") || "").trim();
   if (!name) return;
-  const bot = await prisma.bot.findFirst({ orderBy: { createdAt: "asc" } });
+  const bot = await getActiveBot();
   if (!bot) return;
 
   // Pre-seed with a basic linear funnel: Visita → Lead → Cadastro → Depósito
@@ -43,7 +46,7 @@ async function deleteFunnel(formData: FormData) {
 }
 
 export default async function TrackPage() {
-  const bot = await prisma.bot.findFirst({ orderBy: { createdAt: "asc" } });
+  const bot = await getActiveBot();
   if (!bot) {
     return (
       <div className="p-4 md:p-8">
@@ -85,15 +88,25 @@ export default async function TrackPage() {
                 </div>
               </div>
             </Link>
-            <form action={deleteFunnel} className="flex justify-end">
-              <input type="hidden" name="id" value={f.id} />
-              <button className="btn btn-danger text-xs" style={{ padding: "4px 10px" }}><Trash2 className="w-3.5 h-3.5" /></button>
-            </form>
+            <div className="flex justify-end">
+              <ConfirmDelete
+                title={`Excluir funil "${f.name}"?`}
+                description="O funil e sua configuração de etapas serão apagados."
+                formAction={deleteFunnel}
+                hiddenFields={{ id: f.id }}
+                trigger={<Trash2 className="w-3.5 h-3.5" />}
+              />
+            </div>
           </div>
         ))}
         {funnels.length === 0 && (
-          <div className="card p-8 text-center md:col-span-3" style={{ color: "var(--text-dim)" }}>
-            Você ainda não criou nenhum funil. Crie um acima — ele já vem com 4 etapas pré-configuradas.
+          <div className="card md:col-span-3">
+            <EmptyState
+              icon={Activity}
+              title="Nenhum funil criado"
+              description="Crie acima — vem pré-configurado com Visita → Lead → Cadastro → Depósito, atualização ao vivo a cada 5s."
+              small
+            />
           </div>
         )}
       </div>

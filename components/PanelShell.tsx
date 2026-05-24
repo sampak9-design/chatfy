@@ -3,31 +3,31 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Sidebar } from "./Sidebar";
+import { BotSwitcher } from "./BotSwitcher";
+
+interface BotOpt { id: string; name: string; username: string | null; paused: boolean }
 
 /**
- * Responsive wrapper for the panel pages.
- * - Desktop (md+): sidebar fixed on the left, main fills the rest.
- * - Mobile: sticky top bar with hamburger; sidebar slides in as overlay.
+ * Responsive panel shell.
+ * - Desktop: sidebar left, top bar (height 56px) with BotSwitcher right
+ * - Mobile: sticky top bar with hamburger + logo; sidebar slides in as overlay
  */
-export function PanelShell({ children, adminEmail }: { children: React.ReactNode; adminEmail?: string }) {
+export function PanelShell({
+  children,
+  adminEmail,
+  bots,
+  activeBotId,
+}: {
+  children: React.ReactNode;
+  adminEmail?: string;
+  bots: BotOpt[];
+  activeBotId?: string;
+}) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      {/* Mobile top bar */}
-      <header
-        className="md:hidden sticky top-0 z-30 flex items-center justify-between px-4"
-        style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)", height: 56 }}
-      >
-        <button onClick={() => setOpen(true)} className="p-2 -ml-2" aria-label="Abrir menu">
-          <Menu className="w-5 h-5" />
-        </button>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="VSChat" style={{ height: 32 }} className="object-contain" />
-        <div style={{ width: 24 }} />
-      </header>
-
       {/* Desktop sidebar */}
       <div className="hidden md:block">
         <Sidebar adminEmail={adminEmail} />
@@ -51,7 +51,32 @@ export function PanelShell({ children, adminEmail }: { children: React.ReactNode
         </>
       )}
 
-      <main className="flex-1 min-w-0">{children}</main>
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Top bar — mobile shows hamburger + logo; desktop shows BotSwitcher right */}
+        <header
+          className="sticky top-0 z-30 flex items-center px-3 md:px-6"
+          style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)", height: 56 }}
+        >
+          <button
+            onClick={() => setOpen(true)}
+            className="md:hidden p-2 -ml-2"
+            aria-label="Abrir menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="VSChat" style={{ height: 32 }} className="object-contain md:hidden mx-auto" />
+
+          {/* Desktop spacer + BotSwitcher right */}
+          <div className="hidden md:flex flex-1 items-center justify-end gap-3">
+            <BotSwitcher bots={bots} activeId={activeBotId} />
+          </div>
+          {/* Mobile: empty spacer to balance the hamburger */}
+          <div className="md:hidden" style={{ width: 24 }} />
+        </header>
+
+        <main className="flex-1 min-w-0">{children}</main>
+      </div>
     </div>
   );
 }

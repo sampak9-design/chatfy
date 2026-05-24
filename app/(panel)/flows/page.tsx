@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Workflow, Plus, Trash2 } from "lucide-react";
 import { CopyFlowLink } from "@/components/CopyFlowLink";
+import { getActiveBot } from "@/lib/active-bot";
+import { EmptyState } from "@/components/EmptyState";
+import { ConfirmDelete } from "@/components/ConfirmDelete";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +14,7 @@ async function createFlow(formData: FormData) {
   "use server";
   const name = String(formData.get("name") || "").trim();
   if (!name) return;
-  const bot = await prisma.bot.findFirst({ orderBy: { createdAt: "asc" } });
+  const bot = await getActiveBot();
   if (!bot) return;
 
   const flow = await prisma.flow.create({
@@ -33,7 +36,7 @@ async function deleteFlow(formData: FormData) {
 }
 
 export default async function FlowsPage() {
-  const bot = await prisma.bot.findFirst({ orderBy: { createdAt: "asc" } });
+  const bot = await getActiveBot();
   if (!bot) {
     return (
       <div className="p-4 md:p-8">
@@ -81,17 +84,25 @@ export default async function FlowsPage() {
               </Link>
               <div className="flex items-center justify-between gap-2">
                 {deepLink ? <CopyFlowLink url={deepLink} compact /> : <span className="text-xs" style={{ color: "var(--text-faint)" }}>username do bot indisponível</span>}
-                <form action={deleteFlow}>
-                  <input type="hidden" name="id" value={f.id} />
-                  <button className="btn btn-danger text-xs" style={{ padding: "4px 10px" }}><Trash2 className="w-3.5 h-3.5" /></button>
-                </form>
+                <ConfirmDelete
+                  title={`Excluir fluxo "${f.name}"?`}
+                  description="O fluxo e todas as etapas serão apagados. Se ele estava marcado como boas-vindas, deixa de existir."
+                  formAction={deleteFlow}
+                  hiddenFields={{ id: f.id }}
+                  trigger={<Trash2 className="w-3.5 h-3.5" />}
+                />
               </div>
             </div>
           );
         })}
         {flows.length === 0 && (
-          <div className="card p-8 text-center md:col-span-3" style={{ color: "var(--text-dim)" }}>
-            Você ainda não criou nenhum fluxo.
+          <div className="card md:col-span-3">
+            <EmptyState
+              icon={Workflow}
+              title="Nenhum fluxo criado"
+              description="Crie um fluxo acima — você arrasta blocos (texto, imagem, vídeo, botões) num canvas drag-and-drop."
+              small
+            />
           </div>
         )}
       </div>

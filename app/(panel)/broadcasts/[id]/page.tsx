@@ -74,6 +74,7 @@ async function sendBroadcast(formData: FormData) {
   const id = String(formData.get("id"));
   const status = String(formData.get("targetStatus") || "active") as LeadStatus;
   const origin = String(formData.get("targetOrigin") || "");
+  const tag = String(formData.get("targetTag") || "").trim();
   const scheduledForRaw = String(formData.get("scheduledFor") || "").trim();
 
   const broadcast = await prisma.broadcast.findUnique({ where: { id } });
@@ -96,6 +97,7 @@ async function sendBroadcast(formData: FormData) {
     botId: broadcast.botId,
     status,
     ...(origin ? { origin: origin as LeadOrigin } : {}),
+    ...(tag ? { tags: { has: tag } } : {}),
   };
 
   const leads = await prisma.lead.findMany({ where, select: { id: true } });
@@ -116,7 +118,7 @@ async function sendBroadcast(formData: FormData) {
       failedCount: 0,
       blockedCount: 0,
       finishedAt: null,
-      targetFilter: { status, origin: origin || undefined },
+      targetFilter: { status, origin: origin || undefined, tag: tag || undefined },
     },
   });
 
@@ -185,6 +187,13 @@ export default async function BroadcastDetailPage({
 
   const editable = b.status === "draft" || b.status === "failed";
   const isScheduled = b.status === "scheduled";
+  // Collect all distinct tags across the bot's leads for the dropdown
+  const tagAgg = await prisma.lead.findMany({
+    where: { botId: b.botId },
+    select: { tags: true },
+    take: 5000,
+  });
+  const allTags = Array.from(new Set(tagAgg.flatMap((l) => l.tags))).sort();
   const buttons: ButtonItem[] = (() => {
     const raw = b.buttons as unknown as { text: string; url: string }[][] | null;
     if (!Array.isArray(raw)) return [];
@@ -269,7 +278,7 @@ export default async function BroadcastDetailPage({
           <form action={sendBroadcast} className="card p-6 space-y-4">
             <input type="hidden" name="id" value={b.id} />
             <h2 className="font-semibold">Enviar / agendar</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
                 <label className="label">Status do lead</label>
                 <select name="targetStatus" defaultValue="active" className="input">
@@ -284,6 +293,13 @@ export default async function BroadcastDetailPage({
                   <option value="start">/start</option>
                   <option value="button">Botão</option>
                   <option value="campaign">Campanha</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Tag (opcional)</label>
+                <select name="targetTag" defaultValue="" className="input">
+                  <option value="">Todas</option>
+                  {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
             </div>

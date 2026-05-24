@@ -5,6 +5,9 @@ import { redirect } from "next/navigation";
 import { Megaphone, Plus, Trash2, StopCircle } from "lucide-react";
 import { requestCancel } from "@/lib/broadcast-runner";
 import { LocalTime } from "@/components/LocalTime";
+import { getActiveBot } from "@/lib/active-bot";
+import { EmptyState } from "@/components/EmptyState";
+import { ConfirmDelete } from "@/components/ConfirmDelete";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +36,7 @@ async function createDraft(formData: FormData) {
   "use server";
   const name = String(formData.get("name") || "").trim();
   if (!name) return;
-  const bot = await prisma.bot.findFirst({ orderBy: { createdAt: "asc" } });
+  const bot = await getActiveBot();
   if (!bot) return;
   const b = await prisma.broadcast.create({
     data: { botId: bot.id, name, status: "draft" },
@@ -43,7 +46,7 @@ async function createDraft(formData: FormData) {
 }
 
 export default async function BroadcastsPage() {
-  const bot = await prisma.bot.findFirst({ orderBy: { createdAt: "asc" } });
+  const bot = await getActiveBot();
   if (!bot) {
     return (
       <div className="p-4 md:p-8">
@@ -80,7 +83,14 @@ export default async function BroadcastsPage() {
           </thead>
           <tbody>
             {list.length === 0 ? (
-              <tr><td colSpan={9} className="text-center py-10" style={{ color: "var(--text-faint)" }}>Nenhum disparo ainda.</td></tr>
+              <tr><td colSpan={9} className="p-0">
+                <EmptyState
+                  icon={Megaphone}
+                  title="Nenhum disparo ainda"
+                  description="Crie acima sua primeira campanha de envio em massa."
+                  small
+                />
+              </td></tr>
             ) : list.map((b) => (
               <tr key={b.id} style={{ borderTop: "1px solid var(--border)" }}>
                 <td className="px-4 py-3">
@@ -108,12 +118,13 @@ export default async function BroadcastsPage() {
                         </button>
                       </form>
                     )}
-                    <form action={deleteBroadcastFromList}>
-                      <input type="hidden" name="id" value={b.id} />
-                      <button type="submit" className="btn btn-danger text-xs" style={{ padding: "4px 8px" }} title="Excluir">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </form>
+                    <ConfirmDelete
+                      title={`Excluir disparo "${b.name}"?`}
+                      description="Vai apagar o disparo e todos os logs. Não pode ser desfeito."
+                      formAction={deleteBroadcastFromList}
+                      hiddenFields={{ id: b.id }}
+                      trigger={<Trash2 className="w-3.5 h-3.5" />}
+                    />
                   </div>
                 </td>
               </tr>

@@ -7,6 +7,7 @@ import { tgSend } from "@/lib/telegram";
 import { renderTemplate } from "@/lib/template";
 import { ScrollToBottom } from "@/components/ScrollToBottom";
 import { LocalTime } from "@/components/LocalTime";
+import { getActiveBot } from "@/lib/active-bot";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +72,7 @@ async function sendReply(formData: FormData) {
 
 export default async function InboxPage({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
-  const bot = await prisma.bot.findFirst({ orderBy: { createdAt: "asc" } });
+  const bot = await getActiveBot();
   if (!bot) {
     return (
       <div className="p-4 md:p-8">
