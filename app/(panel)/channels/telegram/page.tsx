@@ -3,12 +3,14 @@ import Link from "next/link";
 import { Plus, Send } from "lucide-react";
 import { LocalTime } from "@/components/LocalTime";
 import { EmptyState } from "@/components/EmptyState";
+import { requireOwnerId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function TelegramChannelPage() {
+  const ownerId = await requireOwnerId();
   const bots = await prisma.bot.findMany({
-    where: { channel: "telegram" },
+    where: { channel: "telegram", ownerId },
     orderBy: { createdAt: "asc" },
   });
 

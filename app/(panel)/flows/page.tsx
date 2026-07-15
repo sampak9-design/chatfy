@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Workflow, Plus, Trash2 } from "lucide-react";
 import { CopyFlowLink } from "@/components/CopyFlowLink";
-import { getActiveBot } from "@/lib/active-bot";
+import { getActiveBot, ownsFlow } from "@/lib/active-bot";
 import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
 
@@ -31,6 +31,7 @@ async function createFlow(formData: FormData) {
 async function deleteFlow(formData: FormData) {
   "use server";
   const id = String(formData.get("id"));
+  if (!(await ownsFlow(id))) return;
   await prisma.flow.delete({ where: { id } });
   revalidatePath("/flows");
 }

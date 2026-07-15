@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { requireOwnerId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,8 @@ export const dynamic = "force-dynamic";
  * Telegram channel list.
  */
 export default async function LegacyBotRedirect() {
-  const bot = await prisma.bot.findFirst({ orderBy: { createdAt: "asc" } });
+  const ownerId = await requireOwnerId();
+  const bot = await prisma.bot.findFirst({ where: { ownerId }, orderBy: { createdAt: "asc" } });
   if (bot) redirect(`/channels/telegram/${bot.id}`);
   redirect("/channels/telegram");
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Webhook, Trash2, Send, PauseCircle, PlayCircle } from "lucide-react";
 import { tgSetWebhook, tgDeleteWebhook } from "@/lib/telegram";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
+import { getOwnedBot } from "@/lib/active-bot";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,8 @@ async function setWelcome(formData: FormData) {
   "use server";
   const botId = String(formData.get("botId"));
   const flowId = String(formData.get("flowId"));
+  const bot = await getOwnedBot(botId);
+  if (!bot) return;
   await prisma.bot.update({
     where: { id: botId },
     data: { welcomeFlowId: flowId || null },
@@ -23,7 +26,7 @@ async function setWelcome(formData: FormData) {
 async function reregisterWebhook(formData: FormData) {
   "use server";
   const botId = String(formData.get("botId"));
-  const bot = await prisma.bot.findUnique({ where: { id: botId } });
+  const bot = await getOwnedBot(botId);
   if (!bot) return;
   const appUrl = process.env.APP_URL;
   if (!appUrl) return;
@@ -34,7 +37,7 @@ async function reregisterWebhook(formData: FormData) {
 async function togglePause(formData: FormData) {
   "use server";
   const botId = String(formData.get("botId"));
-  const bot = await prisma.bot.findUnique({ where: { id: botId } });
+  const bot = await getOwnedBot(botId);
   if (!bot) return;
   await prisma.bot.update({ where: { id: botId }, data: { paused: !bot.paused } });
   revalidatePath(`/channels/telegram/${botId}`);
@@ -43,7 +46,7 @@ async function togglePause(formData: FormData) {
 async function deleteBot(formData: FormData) {
   "use server";
   const botId = String(formData.get("id"));
-  const bot = await prisma.bot.findUnique({ where: { id: botId } });
+  const bot = await getOwnedBot(botId);
   if (!bot) return;
   await tgDeleteWebhook(bot.token).catch(() => {});
   await prisma.bot.delete({ where: { id: botId } });
@@ -53,7 +56,7 @@ async function deleteBot(formData: FormData) {
 
 export default async function BotEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const bot = await prisma.bot.findUnique({ where: { id } });
+  const bot = await getOwnedBot(id);
   if (!bot) notFound();
   const flows = await prisma.flow.findMany({ where: { botId: bot.id }, orderBy: { name: "asc" } });
   const appUrl = process.env.APP_URL || "(defina APP_URL nas envs)";

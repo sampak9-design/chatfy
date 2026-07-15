@@ -6,12 +6,14 @@ import Link from "next/link";
 import { ArrowLeft, Save } from "lucide-react";
 import { CopyFlowLink } from "@/components/CopyFlowLink";
 import { LocalTime } from "@/components/LocalTime";
+import { ownsLanding } from "@/lib/active-bot";
 
 export const dynamic = "force-dynamic";
 
 async function saveLanding(formData: FormData) {
   "use server";
   const id = String(formData.get("id"));
+  if (!(await ownsLanding(id))) return;
   const name = String(formData.get("name") || "").trim();
   const title = String(formData.get("title") || "").trim();
   const subtitle = String(formData.get("subtitle") || "").trim() || null;
@@ -39,6 +41,7 @@ async function saveLanding(formData: FormData) {
 
 export default async function LandingDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  if (!(await ownsLanding(id))) notFound();
   const landing = await prisma.landing.findUnique({
     where: { id },
     include: { bot: true },

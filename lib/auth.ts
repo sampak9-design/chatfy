@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { prisma } from "./db";
 
@@ -56,6 +57,30 @@ export async function getSession() {
   const token = jar.get(COOKIE_NAME)?.value;
   if (!token) return null;
   return await verifySession(token);
+}
+
+/**
+ * The owner id for the current request (the AdminUser id in the session).
+ * Every bot-scoped query filters by this so accounts never see each other's data.
+ * Redirects to /login when there is no valid session.
+ */
+export async function requireOwnerId(): Promise<string> {
+  const session = await getSession();
+  if (!session?.sub) redirect("/login");
+  return session.sub;
+}
+
+/** Current logged-in AdminUser row (or null). */
+export async function getCurrentUser() {
+  const session = await getSession();
+  if (!session?.sub) return null;
+  return prisma.adminUser.findUnique({ where: { id: session.sub } });
+}
+
+/** True when the current user is the super-admin (can manage accounts). */
+export async function isSuperAdmin(): Promise<boolean> {
+  const user = await getCurrentUser();
+  return !!user?.isSuperAdmin;
 }
 
 export const SESSION_COOKIE = COOKIE_NAME;

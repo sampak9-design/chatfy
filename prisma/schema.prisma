@@ -13,8 +13,11 @@ model AdminUser {
   email        String   @unique
   passwordHash String
   name         String?
+  isSuperAdmin Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  bots Bot[]
 
   @@map("admin_users")
 }
@@ -27,6 +30,7 @@ enum BotChannel {
 
 model Bot {
   id              String     @id @default(cuid())
+  ownerId         String?    // AdminUser that owns this bot (account isolation). Nullable for legacy backfill.
   name            String
   token           String     @unique
   username        String?
@@ -44,6 +48,7 @@ model Bot {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  owner             AdminUser?         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   leads             Lead[]
   flows             Flow[]
   broadcasts        Broadcast[]
@@ -53,6 +58,7 @@ model Bot {
   conversionEvents  ConversionEvent[]
   funnels           Funnel[]
 
+  @@index([ownerId])
   @@map("bots")
 }
 

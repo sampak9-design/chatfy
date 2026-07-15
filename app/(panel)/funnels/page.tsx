@@ -6,7 +6,7 @@ import { ExternalLink, Plus, Trash2, Filter as FunnelIcon, Settings as SettingsI
 import { CopyFlowLink } from "@/components/CopyFlowLink";
 import { EmbedSnippet } from "@/components/EmbedSnippet";
 import { nanoid } from "nanoid";
-import { getActiveBot } from "@/lib/active-bot";
+import { getActiveBot, getOwnedBot, ownsLanding } from "@/lib/active-bot";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 async function saveMetaConfig(formData: FormData) {
   "use server";
   const botId = String(formData.get("botId"));
+  if (!(await getOwnedBot(botId))) return;
   const metaPixelId = String(formData.get("metaPixelId") || "").trim() || null;
   const metaAccessToken = String(formData.get("metaAccessToken") || "").trim() || null;
   const metaTestCode = String(formData.get("metaTestCode") || "").trim() || null;
@@ -28,6 +29,7 @@ async function saveMetaConfig(formData: FormData) {
 async function regeneratePostbackSecret(formData: FormData) {
   "use server";
   const botId = String(formData.get("botId"));
+  if (!(await getOwnedBot(botId))) return;
   await prisma.bot.update({
     where: { id: botId },
     data: { postbackSecret: nanoid(32) },
@@ -38,6 +40,7 @@ async function regeneratePostbackSecret(formData: FormData) {
 async function createLanding(formData: FormData) {
   "use server";
   const botId = String(formData.get("botId"));
+  if (!(await getOwnedBot(botId))) return;
   const siteUrlRaw = String(formData.get("siteUrl") || "").trim();
   const customName = String(formData.get("name") || "").trim();
   if (!siteUrlRaw && !customName) return;
@@ -82,6 +85,7 @@ async function createLanding(formData: FormData) {
 async function deleteLanding(formData: FormData) {
   "use server";
   const id = String(formData.get("id"));
+  if (!(await ownsLanding(id))) return;
   await prisma.landing.delete({ where: { id } });
   revalidatePath("/funnels");
 }

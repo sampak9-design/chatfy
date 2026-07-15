@@ -3,12 +3,14 @@ import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { FlowEditor } from "@/components/flow-editor/FlowEditor";
 import type { FlowGraph, FlowNodeData } from "@/components/flow-editor/types";
+import { ownsFlow } from "@/lib/active-bot";
 
 export const dynamic = "force-dynamic";
 
 async function saveFlow(formData: FormData) {
   "use server";
   const id = String(formData.get("id"));
+  if (!(await ownsFlow(id))) return;
   const graphRaw = String(formData.get("graph"));
   const name = String(formData.get("name") || "").trim();
 
@@ -101,6 +103,7 @@ async function saveFlow(formData: FormData) {
 async function setAsWelcome(formData: FormData) {
   "use server";
   const id = String(formData.get("id"));
+  if (!(await ownsFlow(id))) return;
   const flow = await prisma.flow.findUnique({ where: { id } });
   if (!flow) return;
   await prisma.bot.update({ where: { id: flow.botId }, data: { welcomeFlowId: id } });
@@ -110,6 +113,7 @@ async function setAsWelcome(formData: FormData) {
 
 export default async function FlowEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  if (!(await ownsFlow(id))) notFound();
   const flow = await prisma.flow.findUnique({ where: { id } });
   if (!flow) notFound();
   const bot = await prisma.bot.findUnique({ where: { id: flow.botId } });

@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { tgGetMe, tgSetWebhook } from "@/lib/telegram";
 import { nanoid } from "nanoid";
 import { setActiveBot } from "@/lib/active-bot";
+import { requireOwnerId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +16,13 @@ async function createBot(formData: FormData) {
   const token = String(formData.get("token") || "").trim();
   if (!name || !token) return;
 
+  const ownerId = await requireOwnerId();
+
   const me = (await tgGetMe(token)) as { ok: boolean; result?: { username?: string } };
   const username = me.ok ? me.result?.username : undefined;
 
   const bot = await prisma.bot.create({
-    data: { name, token, username, channel: "telegram", webhookSecret: nanoid(32) },
+    data: { name, token, username, channel: "telegram", webhookSecret: nanoid(32), ownerId },
   });
 
   const appUrl = process.env.APP_URL;
