@@ -24,6 +24,7 @@ import Link from "next/link";
 import { StepNode } from "./StepNode";
 import { CopyFlowLink } from "@/components/CopyFlowLink";
 import type { FlowGraph, FlowNode, FlowNodeData, StepButton, StepKind } from "./types";
+import { secondsToParts, partsToSeconds, DELAY_UNIT_LABEL, type DelayUnit } from "./delay";
 
 const nodeTypes = { step: StepNode };
 
@@ -49,7 +50,7 @@ interface Props {
 
 function defaultDataFor(kind: StepKind): FlowNodeData {
   switch (kind) {
-    case "delay": return { type: kind, delaySeconds: 5 };
+    case "delay": return { type: kind, delaySeconds: 86400 }; // 1 dia (funil diário); ajuste a unidade no painel
     case "buttons": return { type: kind, content: "Escolha uma opção:", buttons: [] };
     default: return { type: kind, content: kind === "text" ? "Olá!" : "" };
   }
@@ -272,16 +273,37 @@ function PropertiesPanel({
       </div>
 
       {data.type === "delay" ? (
-        <div>
-          <label className="label">Esperar (segundos)</label>
-          <input
-            type="number"
-            min={1}
-            value={data.delaySeconds ?? 5}
-            onChange={(e) => onChange({ delaySeconds: parseInt(e.target.value || "0") })}
-            className="input"
-          />
-        </div>
+        (() => {
+          const { value, unit } = secondsToParts(data.delaySeconds ?? 5);
+          return (
+            <div>
+              <label className="label">Esperar antes do próximo passo</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  value={value}
+                  onChange={(e) => onChange({ delaySeconds: partsToSeconds(parseInt(e.target.value || "0"), unit) })}
+                  className="input"
+                  style={{ flex: 1 }}
+                />
+                <select
+                  value={unit}
+                  onChange={(e) => onChange({ delaySeconds: partsToSeconds(value, e.target.value as DelayUnit) })}
+                  className="input"
+                  style={{ width: 130 }}
+                >
+                  {(["seconds", "minutes", "hours", "days"] as DelayUnit[]).map((u) => (
+                    <option key={u} value={u}>{DELAY_UNIT_LABEL[u]}</option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-[11px] mt-1" style={{ color: "var(--text-faint)" }}>
+                Para um funil diário, use <b>1 dia</b> (24h) entre cada mensagem. A contagem é individual: começa quando cada lead dá /start.
+              </p>
+            </div>
+          );
+        })()
       ) : (
         <>
           <div>

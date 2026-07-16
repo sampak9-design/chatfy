@@ -7,7 +7,9 @@ import { prisma } from "../db";
 import { tgSend } from "../telegram";
 import { renderTemplate } from "../template";
 import { getRedis } from "./redis";
+import { runFlowFrom } from "../flow-engine";
 import type { BroadcastJob } from "./broadcast-queue";
+import type { FlowJob } from "./flow-queue";
 import type { StepType } from "@prisma/client";
 
 // Telegram limits ~30 msg/sec. We use BullMQ's `limiter` per worker = 25/sec safe headroom.
@@ -125,8 +127,42 @@ async function finalizeIfDone(broadcastId: string) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Flow worker — resumes a lead's journey after a scheduled delay (e.g. the 24h
+// between each day of a 60-day drip). One job = render one step, which itself
+// may schedule the next step's job when it hits the next long delay.
+// ---------------------------------------------------------------------------
+console.log("[worker] starting flow worker");
+
+const flowWorker = new Worker<FlowJob>(
+  "flow-steps",
+  async (job) => {
+    const { botId, leadId, stepId, token } = job.data;
+
+    const [bot, lead] = await Promise.all([
+      prisma.bot.findUnique({ where: { id: botId } }),
+      prisma.lead.findUnique({ where: { id: leadId } }),
+    ]);
+    if (!bot || !lead) return;
+    if (bot.paused || !bot.active) return;          // bot off → hold (job removed; won't retry the day)
+    if (lead.status !== "active") return;           // blocked/unsubscribed → stop the journey
+    if ((lead.flowToken ?? "") !== token) return;   // superseded by a newer run → skip
+
+    await runFlowFrom(bot, lead, stepId);
+  },
+  {
+    connection: getRedis(),
+    concurrency: 10,
+    limiter: RATE,
+  },
+);
+
+flowWorker.on("failed", (job, err) => {
+  console.error("[worker] flow job failed", job?.id, err.message);
+});
+
 process.on("SIGTERM", async () => {
   console.log("[worker] SIGTERM, draining…");
-  await worker.close();
+  await Promise.all([worker.close(), flowWorker.close()]);
   process.exit(0);
 });

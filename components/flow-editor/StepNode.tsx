@@ -3,6 +3,7 @@
 import { Handle, Position, type NodeProps } from "reactflow";
 import { MessageSquare, Image as ImageIcon, Video, Music, FileText, Clock, MousePointerClick, Play, Trash2 } from "lucide-react";
 import type { FlowNodeData, StepKind } from "./types";
+import { formatDelay } from "./delay";
 
 const META: Record<StepKind, { icon: React.ComponentType<{ className?: string }>; color: string; label: string }> = {
   start: { icon: Play, color: "#22c55e", label: "Início" },
@@ -20,7 +21,7 @@ export function StepNode({ id, data, selected }: NodeProps<FlowNodeData>) {
   const Icon = meta.icon;
 
   const preview = data.type === "delay"
-    ? `${data.delaySeconds ?? 0}s`
+    ? `⏳ ${formatDelay(data.delaySeconds ?? 0)}`
     : data.type === "buttons"
     ? `${data.buttons?.length ?? 0} botão(ões)`
     : data.content

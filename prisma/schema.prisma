@@ -103,6 +103,7 @@ model Lead {
   languageCode   String?
   currentFlowId  String?
   currentStepId  String?
+  flowToken      String?    // identifies the current flow run; delayed step-jobs with a stale token are ignored (prevents duplicates on re-/start)
   lastInteraction DateTime  @default(now())
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
