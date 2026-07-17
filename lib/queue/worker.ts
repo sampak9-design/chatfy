@@ -8,6 +8,8 @@ import { tgSend } from "../telegram";
 import { renderTemplate } from "../template";
 import { getRedis } from "./redis";
 import { runFlowFrom } from "../flow-engine";
+import { processAllSequences } from "../sequence-engine";
+import { ensureSequenceTick } from "./sequence-queue";
 import type { BroadcastJob } from "./broadcast-queue";
 import type { FlowJob } from "./flow-queue";
 import type { StepType } from "@prisma/client";
@@ -161,8 +163,31 @@ flowWorker.on("failed", (job, err) => {
   console.error("[worker] flow job failed", job?.id, err.message);
 });
 
+// ---------------------------------------------------------------------------
+// Sequence worker — a repeatable "tick" sweeps all leads and delivers the day
+// each one is due (day-based drip anchored to Lead.createdAt).
+// ---------------------------------------------------------------------------
+console.log("[worker] starting sequence worker");
+
+const sequenceWorker = new Worker(
+  "sequence-tick",
+  async () => {
+    await processAllSequences();
+  },
+  { connection: getRedis(), concurrency: 1 },
+);
+
+sequenceWorker.on("failed", (job, err) => {
+  console.error("[worker] sequence tick failed", job?.id, err.message);
+});
+
+// Register the repeatable schedule once the worker is up.
+ensureSequenceTick()
+  .then(() => console.log("[worker] sequence tick scheduled (every 15min)"))
+  .catch((err) => console.error("[worker] failed to schedule sequence tick", err));
+
 process.on("SIGTERM", async () => {
   console.log("[worker] SIGTERM, draining…");
-  await Promise.all([worker.close(), flowWorker.close()]);
+  await Promise.all([worker.close(), flowWorker.close(), sequenceWorker.close()]);
   process.exit(0);
 });

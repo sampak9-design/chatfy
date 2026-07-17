@@ -55,6 +55,13 @@ export async function ownsLanding(landingId: string): Promise<boolean> {
   return !!l;
 }
 
+/** True if the sequence's bot belongs to the current account. */
+export async function ownsSequence(sequenceId: string): Promise<boolean> {
+  const ownerId = await requireOwnerId();
+  const s = await prisma.sequence.findFirst({ where: { id: sequenceId, bot: { ownerId } }, select: { id: true } });
+  return !!s;
+}
+
 export async function setActiveBot(botId: string) {
   const jar = await cookies();
   jar.set(COOKIE, botId, {

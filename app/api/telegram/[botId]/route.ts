@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { tgAnswerCallback } from "@/lib/telegram";
 import { handleButtonCallback, startFlow } from "@/lib/flow-engine";
+import { processSequencesForLead } from "@/lib/sequence-engine";
 import { sendCapiEvent } from "@/lib/meta-capi";
 import type { Bot, Lead } from "@prisma/client";
 
@@ -171,6 +172,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ botId: str
       if (targetFlowId) {
         startFlow(bot, lead, targetFlowId).catch((e) => console.error("[startFlow]", e));
       }
+
+      // Enroll in active drip sequences and fire the day this lead is due right now.
+      processSequencesForLead(bot, lead).catch((e) => console.error("[sequence]", e));
     } else if (update.callback_query?.data?.startsWith("step:")) {
       const cq = update.callback_query;
       const lead = await upsertLead(bot, cq.from, "button");

@@ -17,6 +17,7 @@ import {
   Send,
   Activity,
   Layers,
+  CalendarClock,
 } from "lucide-react";
 
 type IconComp = typeof LayoutDashboard;
@@ -42,6 +43,7 @@ const flatItems: Item[] = [
   { href: "/leads", label: "Audiência", icon: Users },
   { href: "/flows", label: "Fluxos", icon: Workflow },
   { href: "/broadcasts", label: "Disparos", icon: Megaphone },
+  { href: "/sequences", label: "Sequência de Disparos", icon: CalendarClock },
 ];
 
 const groups: Group[] = [
