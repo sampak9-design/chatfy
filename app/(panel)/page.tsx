@@ -108,6 +108,28 @@ export default async function DashboardPage({
     series.push({ x: `${d.getDate()}/${d.getMonth() + 1}`, y: byDay.get(ymd(d)) ?? 0 });
   }
 
+  // Single-day range → break down by hour (24 points) so the chart is readable.
+  let chartSeries = series;
+  let chartLabel = `Leads por dia · ${ymd(rangeStart).split("-").reverse().join("/")} — ${ymd(rangeEnd).split("-").reverse().join("/")}`;
+  if (spanDays === 1) {
+    const hourly = await prisma.$queryRaw<{ h: number; count: bigint }[]>`
+      SELECT EXTRACT(HOUR FROM "createdAt")::int AS h, COUNT(*)::bigint AS count
+      FROM leads
+      WHERE "botId" = ${bot.id}
+        AND "createdAt" >= ${rangeStart}
+        AND "createdAt" <= ${rangeEnd}
+      GROUP BY h
+      ORDER BY h ASC
+    `;
+    const byHour = new Map<number, number>();
+    for (const r of hourly) byHour.set(Number(r.h), Number(r.count));
+    chartSeries = [];
+    for (let h = 0; h < 24; h++) {
+      chartSeries.push({ x: `${String(h).padStart(2, "0")}h`, y: byHour.get(h) ?? 0 });
+    }
+    chartLabel = `Leads por hora · ${ymd(rangeStart).split("-").reverse().join("/")}`;
+  }
+
   // Quick-range presets (href back to this page).
   const presetHref = (days: number) => {
     const to = new Date();
@@ -118,7 +140,6 @@ export default async function DashboardPage({
   const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = ymd(yesterday);
   const dayHref = (s: string) => `/?from=${s}&to=${s}`;
-  const rangeLabel = `${ymd(rangeStart).split("-").reverse().join("/")} — ${ymd(rangeEnd).split("-").reverse().join("/")}`;
 
   const originSlices = originAgg.map((o) => ({
     label: o.source || "(direto)",
@@ -166,7 +187,7 @@ export default async function DashboardPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="card p-5 lg:col-span-2">
-          <LineChart data={series} label={`Leads por dia · ${rangeLabel}`} />
+          <LineChart data={chartSeries} label={chartLabel} />
         </div>
         <div className="card p-5">
           <PieChart data={originSlices} label="Origem (fonte)" />
