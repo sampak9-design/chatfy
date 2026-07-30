@@ -114,6 +114,10 @@ export default async function DashboardPage({
     const from = new Date(); from.setDate(from.getDate() - (days - 1));
     return `/?from=${ymd(from)}&to=${ymd(to)}`;
   };
+  const todayStr = ymd(new Date());
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = ymd(yesterday);
+  const dayHref = (s: string) => `/?from=${s}&to=${s}`;
   const rangeLabel = `${ymd(rangeStart).split("-").reverse().join("/")} — ${ymd(rangeEnd).split("-").reverse().join("/")}`;
 
   const originSlices = originAgg.map((o) => ({
@@ -143,7 +147,9 @@ export default async function DashboardPage({
             <input type="date" name="to" defaultValue={ymd(rangeEnd)} max={ymd(new Date())} className="input" style={{ width: 150 }} />
           </div>
           <button className="btn btn-primary">Aplicar</button>
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap">
+            <Link href={dayHref(todayStr)} className="btn btn-ghost" style={{ padding: "6px 10px" }}>Hoje</Link>
+            <Link href={dayHref(yesterdayStr)} className="btn btn-ghost" style={{ padding: "6px 10px" }}>Ontem</Link>
             <Link href={presetHref(7)} className="btn btn-ghost" style={{ padding: "6px 10px" }}>7d</Link>
             <Link href={presetHref(30)} className="btn btn-ghost" style={{ padding: "6px 10px" }}>30d</Link>
             <Link href={presetHref(90)} className="btn btn-ghost" style={{ padding: "6px 10px" }}>90d</Link>
