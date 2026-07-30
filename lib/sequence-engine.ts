@@ -1,21 +1,20 @@
 /**
- * Sequence engine — day-based drip anchored to each lead's entry (Lead.createdAt).
+ * Sequence engine — day-based drip anchored to each lead's ENROLLMENT.
  *
- * "Dia atual" do lead = quantos dias completos se passaram desde a entrada + 1.
- *   - entrou hoje        → dia 1
- *   - entrou ontem       → dia 2
- *   - entrou há 5 dias   → dia 6
+ * Ao ser inscrito (primeiro /start ou "Processar agora"), grava-se startedAt.
+ * "Dia atual" do lead = dias completos desde startedAt + 1 → TODO mundo começa
+ * no Dia 1 a partir da inscrição, independente de quando entrou no bot.
+ *   - inscrito agora     → dia 1
+ *   - inscrito ontem     → dia 2
  *
  * Regras:
- *   - o passo cujo `day` == dia atual é ENVIADO (uma vez).
- *   - passos de dias já vencidos (day < dia atual) que nunca foram entregues são
- *     marcados como "skipped" (não reenviados) — é o catch-up de quem já estava
- *     no meio do caminho quando a sequência foi criada.
+ *   - envia (uma vez) todos os passos com day <= dia atual que ainda não foram
+ *     entregues, em ordem. Normalmente é 1 por dia; se o worker ficou parado, os
+ *     dias represados saem em sequência (sem pular nenhum).
  *   - passos futuros (day > dia atual) esperam o dia chegar.
  *
- * Idempotência: SequenceDelivery tem unique(stepId, leadId). A entrega é
- * "reivindicada" criando o registro antes de enviar, então webhook e tick
- * nunca disparam o mesmo dia duas vezes.
+ * Idempotência: SequenceDelivery tem unique(stepId, leadId) — reserva antes de
+ * enviar, então webhook e tick nunca disparam o mesmo dia duas vezes.
  */
 import { prisma } from "./db";
 import { startFlow } from "./flow-engine";
@@ -25,21 +24,10 @@ const DAY_MS = 86_400_000;
 
 type SequenceWithSteps = Sequence & { steps: SequenceStep[] };
 
-/** 1-based day of the journey for this lead, right now. */
-function currentDay(lead: Lead, now: number): number {
-  const elapsed = Math.max(0, now - lead.createdAt.getTime());
-  return Math.floor(elapsed / DAY_MS) + 1;
-}
-
 /** Try to reserve a delivery row. Returns false if it already exists. */
-async function claim(
-  sequenceId: string,
-  stepId: string,
-  leadId: string,
-  status: "sent" | "skipped",
-): Promise<boolean> {
+async function claim(sequenceId: string, stepId: string, leadId: string): Promise<boolean> {
   try {
-    await prisma.sequenceDelivery.create({ data: { sequenceId, stepId, leadId, status } });
+    await prisma.sequenceDelivery.create({ data: { sequenceId, stepId, leadId, status: "sent" } });
     return true;
   } catch (e: unknown) {
     if (typeof e === "object" && e && "code" in e && (e as { code?: string }).code === "P2002") return false;
@@ -47,23 +35,45 @@ async function claim(
   }
 }
 
+/** Enrollment anchor for (sequence, lead) — creates it (startedAt = now) on first touch. */
+async function anchorStartedAt(sequenceId: string, leadId: string): Promise<Date> {
+  const existing = await prisma.sequenceEnrollment.findUnique({
+    where: { sequenceId_leadId: { sequenceId, leadId } },
+    select: { startedAt: true },
+  });
+  if (existing) return existing.startedAt;
+  try {
+    const created = await prisma.sequenceEnrollment.create({
+      data: { sequenceId, leadId },
+      select: { startedAt: true },
+    });
+    return created.startedAt;
+  } catch {
+    // Race: created concurrently — read it back.
+    const again = await prisma.sequenceEnrollment.findUnique({
+      where: { sequenceId_leadId: { sequenceId, leadId } },
+      select: { startedAt: true },
+    });
+    return again?.startedAt ?? new Date();
+  }
+}
+
 async function deliverForLead(bot: Bot, lead: Lead, sequences: SequenceWithSteps[], now: number) {
   if (lead.status !== "active") return;
-  const day = currentDay(lead, now);
 
   for (const seq of sequences) {
+    if (seq.steps.length === 0) continue;
+    const startedAt = await anchorStartedAt(seq.id, lead.id);
+    const day = Math.floor(Math.max(0, now - startedAt.getTime()) / DAY_MS) + 1;
+
     for (const step of seq.steps) {
-      if (step.day > day) break; // steps are ordered by day → nothing else is due
-      const send = step.day === day;
-      const reserved = await claim(seq.id, step.id, lead.id, send ? "sent" : "skipped");
-      if (!reserved) continue; // already delivered/skipped in a previous run
-      if (!send) continue; // past day → recorded as skipped, nothing to send
+      if (step.day > day) break; // ordered by day → nothing else is due yet
+      const reserved = await claim(seq.id, step.id, lead.id);
+      if (!reserved) continue; // already delivered
 
       try {
         const sent = await startFlow(bot, lead, step.flowId);
         if (!sent) {
-          // Flow has no connected "Início" step → nothing to send. Mark as failed
-          // so it shows up as a problem instead of a phantom "sent".
           console.error("[sequence] flow has no entry step", { seq: seq.id, step: step.id, flow: step.flowId });
           await prisma.sequenceDelivery
             .update({ where: { stepId_leadId: { stepId: step.id, leadId: lead.id } }, data: { status: "failed" } })
@@ -87,6 +97,16 @@ export async function processSequencesForLead(bot: Bot, lead: Lead) {
   });
   if (sequences.length === 0) return;
   await deliverForLead(bot, lead, sequences, Date.now());
+}
+
+/**
+ * Reset a sequence: wipe all deliveries + enrollments so every lead restarts at
+ * Dia 1 from now. After this, "Processar agora" (or the next tick / /start) will
+ * re-enroll everyone and send Dia 1.
+ */
+export async function resetSequence(sequenceId: string) {
+  await prisma.sequenceDelivery.deleteMany({ where: { sequenceId } });
+  await prisma.sequenceEnrollment.deleteMany({ where: { sequenceId } });
 }
 
 /** Run one sequence now against all active leads of its bot (used by the "Processar agora" button). */

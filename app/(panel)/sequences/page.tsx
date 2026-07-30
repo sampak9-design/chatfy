@@ -50,7 +50,7 @@ export default async function SequencesPage() {
       <div>
         <h1 className="text-2xl font-semibold">Sequência de Disparos</h1>
         <p className="text-sm" style={{ color: "var(--text-dim)" }}>
-          Funil por dia, individual pra cada lead. O Dia 1 começa quando a pessoa dá /start; os próximos avançam de 24 em 24h. Quem já entrou antes pega o dia que corresponde ao tempo dele.
+          Funil por dia, individual pra cada lead. Todos começam no Dia 1 quando são inscritos (no /start ou quando você processa a sequência) e avançam de 24 em 24h — cada um no próprio relógio.
         </p>
       </div>
 

@@ -2,9 +2,9 @@ import { prisma } from "@/lib/db";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, Workflow, PauseCircle, PlayCircle, CheckCircle2, Play, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Workflow, PauseCircle, PlayCircle, CheckCircle2, Play, AlertTriangle, RotateCcw } from "lucide-react";
 import { ownsSequence } from "@/lib/active-bot";
-import { processSequenceNow } from "@/lib/sequence-engine";
+import { processSequenceNow, resetSequence } from "@/lib/sequence-engine";
 import { requireOwnerId } from "@/lib/auth";
 import { LocalTime } from "@/components/LocalTime";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
@@ -56,6 +56,16 @@ async function processNow(formData: FormData) {
   await processSequenceNow(id);
   revalidatePath(`/sequences/${id}`);
   redirect(`/sequences/${id}?processed=1`);
+}
+
+async function restartFromDay1(formData: FormData) {
+  "use server";
+  const id = String(formData.get("id"));
+  if (!(await ownsSequence(id))) return;
+  await resetSequence(id);       // zera entregas + inscrições
+  await processSequenceNow(id);  // reinscreve todos e envia o Dia 1 agora
+  revalidatePath(`/sequences/${id}`);
+  redirect(`/sequences/${id}?restarted=1`);
 }
 
 export default async function SequenceDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -118,10 +128,21 @@ export default async function SequenceDetail({ params }: { params: Promise<{ id:
       <div className="card p-5 space-y-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h2 className="font-semibold">Diagnóstico</h2>
-          <form action={processNow}>
-            <input type="hidden" name="id" value={seq.id} />
-            <button className="btn btn-primary"><Play className="w-4 h-4" /> Processar agora</button>
-          </form>
+          <div className="flex items-center gap-2">
+            <form action={processNow}>
+              <input type="hidden" name="id" value={seq.id} />
+              <button className="btn btn-ghost"><Play className="w-4 h-4" /> Processar agora</button>
+            </form>
+            <ConfirmDelete
+              title="Reiniciar do Dia 1 pra todos?"
+              description="Apaga o histórico de entregas e inscrições desta sequência e recomeça: TODOS os leads ativos voltam pro Dia 1 a partir de agora e avançam de 24 em 24h. Não afeta os fluxos."
+              formAction={restartFromDay1}
+              hiddenFields={{ id: seq.id }}
+              trigger={<><RotateCcw className="w-4 h-4" /> Reiniciar do Dia 1</>}
+              triggerClassName="btn btn-primary"
+              triggerStyle={{}}
+            />
+          </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           <Stat label="Status" value={seq.active ? "ativa" : "pausada"} ok={seq.active} />
@@ -142,7 +163,7 @@ export default async function SequenceDetail({ params }: { params: Promise<{ id:
           </Warn>
         )}
         <p className="text-[11px]" style={{ color: "var(--text-faint)" }}>
-          “Processar agora” roda o funil na hora pra todos os leads ativos (útil pra inscrever quem já tinha entrado). O avanço automático diário roda sozinho a cada 15 min no worker.
+          Todos começam no <b>Dia 1</b> a partir da inscrição (quando dão /start ou quando você processa) e avançam de 24 em 24h. “Processar agora” inscreve/avança os leads ativos sem apagar nada. “Reiniciar do Dia 1” zera tudo e recomeça todo mundo do Dia 1. O avanço diário roda sozinho a cada 15 min no worker.
         </p>
       </div>
 

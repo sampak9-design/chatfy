@@ -75,12 +75,30 @@ model Sequence {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bot        Bot                @relation(fields: [botId], references: [id], onDelete: Cascade)
-  steps      SequenceStep[]
-  deliveries SequenceDelivery[]
+  bot         Bot                  @relation(fields: [botId], references: [id], onDelete: Cascade)
+  steps       SequenceStep[]
+  deliveries  SequenceDelivery[]
+  enrollments SequenceEnrollment[]
 
   @@index([botId])
   @@map("sequences")
+}
+
+/// Per-lead anchor for a sequence. `startedAt` is when the lead was enrolled
+/// (first /start or "Processar agora") — the Dia 1 reference. Everyone starts
+/// at Dia 1 from their own startedAt, regardless of when they entered the bot.
+model SequenceEnrollment {
+  id         String   @id @default(cuid())
+  sequenceId String
+  leadId     String
+  startedAt  DateTime @default(now())
+
+  sequence Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([sequenceId, leadId])
+  @@index([leadId])
+  @@map("sequence_enrollments")
 }
 
 model SequenceStep {
@@ -174,6 +192,7 @@ model Lead {
   messages      Message[]
   trackingSessions TrackingSession[]
   sequenceDeliveries SequenceDelivery[]
+  sequenceEnrollments SequenceEnrollment[]
 
   @@unique([botId, telegramId])
   @@index([botId, status])
