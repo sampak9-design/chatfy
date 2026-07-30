@@ -8,13 +8,29 @@ import { getActiveBot } from "@/lib/active-bot";
 
 export const dynamic = "force-dynamic";
 
-/** yyyy-mm-dd from a Date using local parts (stable for <input type=date>). */
-function ymd(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+// Todas as datas do painel são no fuso de Brasília (sem horário de verão desde 2019).
+const TZ = "America/Sao_Paulo";
+const BR_OFFSET = "-03:00";
+const DAY_MS = 86_400_000;
+
+/** yyyy-mm-dd de uma instância no fuso de Brasília. */
+function ymdBR(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 }
-function startOfDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
-function endOfDay(d: Date) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
-function daysBetween(a: Date, b: Date) { return Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / 86400000); }
+/** Instante UTC correspondente ao início (ou fim) de um dia yyyy-mm-dd em Brasília. */
+function brDate(ymdStr: string, end = false): Date {
+  return new Date(`${ymdStr}T${end ? "23:59:59.999" : "00:00:00"}${BR_OFFSET}`);
+}
+function addDaysStr(ymdStr: string, n: number): string {
+  return ymdBR(new Date(brDate(ymdStr).getTime() + n * DAY_MS));
+}
+function daysBetweenStr(a: string, b: string): number {
+  return Math.round((brDate(b).getTime() - brDate(a).getTime()) / DAY_MS);
+}
+/** yyyy-mm-dd → dd/mm/yyyy para exibição. */
+function br(ymdStr: string): string {
+  return ymdStr.split("-").reverse().join("/");
+}
 
 function Kpi({ icon: Icon, label, value, accent }: { icon: typeof Users; label: string; value: number | string; accent?: string }) {
   return (
@@ -38,21 +54,18 @@ export default async function DashboardPage({
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
   const bot = await getActiveBot();
-  const today = startOfDay(new Date());
 
-  // Selected date range (defaults to the last 30 days). Parsed from ?from=&to=.
+  // Período selecionado (padrão: últimos 30 dias), tudo em horário de Brasília.
   const sp = await searchParams;
-  const parse = (s?: string) => {
-    if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
-    const d = new Date(`${s}T00:00:00`);
-    return isNaN(d.getTime()) ? null : d;
-  };
-  let toDate = parse(sp.to) ?? new Date();
-  let fromDate = parse(sp.from) ?? (() => { const d = new Date(toDate); d.setDate(d.getDate() - 29); return d; })();
-  if (fromDate > toDate) [fromDate, toDate] = [toDate, fromDate];
-  const rangeStart = startOfDay(fromDate);
-  const rangeEnd = endOfDay(toDate);
-  const spanDays = Math.min(366, Math.max(1, daysBetween(rangeStart, rangeEnd) + 1));
+  const valid = (s?: string) => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const todayStr = ymdBR(new Date());
+  let toStr = valid(sp.to) ? sp.to! : todayStr;
+  let fromStr = valid(sp.from) ? sp.from! : ymdBR(new Date(Date.now() - 29 * DAY_MS));
+  if (fromStr > toStr) [fromStr, toStr] = [toStr, fromStr];
+  const rangeStart = brDate(fromStr);
+  const rangeEnd = brDate(toStr, true);
+  const spanDays = Math.min(366, Math.max(1, daysBetweenStr(fromStr, toStr) + 1));
+  const todayBRStart = brDate(todayStr);
 
   if (!bot) {
     return (
@@ -73,13 +86,14 @@ export default async function DashboardPage({
     prisma.lead.count({ where: { botId: bot.id } }),
     prisma.lead.count({ where: { botId: bot.id, status: "active" } }),
     prisma.lead.count({ where: { botId: bot.id, status: "blocked" } }),
-    prisma.lead.count({ where: { botId: bot.id, createdAt: { gte: today } } }),
+    prisma.lead.count({ where: { botId: bot.id, createdAt: { gte: todayBRStart } } }),
     prisma.lead.count({ where: { botId: bot.id, createdAt: { gte: rangeStart, lte: rangeEnd } } }),
     prisma.lead.findMany({ where: { botId: bot.id }, orderBy: { createdAt: "desc" }, take: 8 }),
     prisma.broadcast.findMany({ where: { botId: bot.id }, orderBy: { createdAt: "desc" }, take: 5 }),
-    // Leads per day within the selected range
-    prisma.$queryRaw<{ day: Date; count: bigint }[]>`
-      SELECT date_trunc('day', "createdAt") AS day, COUNT(*)::bigint AS count
+    // Leads por dia (agrupado no fuso de Brasília) dentro do período
+    prisma.$queryRaw<{ day: string; count: bigint }[]>`
+      SELECT to_char(date_trunc('day', "createdAt" AT TIME ZONE 'America/Sao_Paulo'), 'YYYY-MM-DD') AS day,
+             COUNT(*)::bigint AS count
       FROM leads
       WHERE "botId" = ${bot.id}
         AND "createdAt" >= ${rangeStart}
@@ -97,23 +111,23 @@ export default async function DashboardPage({
     }),
   ]);
 
-  // Build the per-day series across the range, filling missing days with 0.
+  // Série por dia no período (dias em Brasília), preenchendo faltas com 0.
   const series: { x: string; y: number }[] = [];
   const byDay = new Map<string, number>();
-  for (const r of leadsByDay) {
-    byDay.set(ymd(new Date(r.day)), Number(r.count));
-  }
+  for (const r of leadsByDay) byDay.set(r.day, Number(r.count));
   for (let i = 0; i < spanDays; i++) {
-    const d = new Date(rangeStart); d.setDate(d.getDate() + i);
-    series.push({ x: `${d.getDate()}/${d.getMonth() + 1}`, y: byDay.get(ymd(d)) ?? 0 });
+    const key = addDaysStr(fromStr, i);
+    const [, m, d] = key.split("-");
+    series.push({ x: `${Number(d)}/${Number(m)}`, y: byDay.get(key) ?? 0 });
   }
 
-  // Single-day range → break down by hour (24 points) so the chart is readable.
+  // Período de um dia só → quebra por hora (24 pontos) no fuso de Brasília.
   let chartSeries = series;
-  let chartLabel = `Leads por dia · ${ymd(rangeStart).split("-").reverse().join("/")} — ${ymd(rangeEnd).split("-").reverse().join("/")}`;
+  let chartLabel = `Leads por dia · ${br(fromStr)} — ${br(toStr)}`;
   if (spanDays === 1) {
     const hourly = await prisma.$queryRaw<{ h: number; count: bigint }[]>`
-      SELECT EXTRACT(HOUR FROM "createdAt")::int AS h, COUNT(*)::bigint AS count
+      SELECT EXTRACT(HOUR FROM ("createdAt" AT TIME ZONE 'America/Sao_Paulo'))::int AS h,
+             COUNT(*)::bigint AS count
       FROM leads
       WHERE "botId" = ${bot.id}
         AND "createdAt" >= ${rangeStart}
@@ -127,18 +141,12 @@ export default async function DashboardPage({
     for (let h = 0; h < 24; h++) {
       chartSeries.push({ x: `${String(h).padStart(2, "0")}h`, y: byHour.get(h) ?? 0 });
     }
-    chartLabel = `Leads por hora · ${ymd(rangeStart).split("-").reverse().join("/")}`;
+    chartLabel = `Leads por hora · ${br(fromStr)}`;
   }
 
-  // Quick-range presets (href back to this page).
-  const presetHref = (days: number) => {
-    const to = new Date();
-    const from = new Date(); from.setDate(from.getDate() - (days - 1));
-    return `/?from=${ymd(from)}&to=${ymd(to)}`;
-  };
-  const todayStr = ymd(new Date());
-  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = ymd(yesterday);
+  // Atalhos de período (datas em Brasília).
+  const presetHref = (days: number) => `/?from=${ymdBR(new Date(Date.now() - (days - 1) * DAY_MS))}&to=${todayStr}`;
+  const yesterdayStr = ymdBR(new Date(Date.now() - DAY_MS));
   const dayHref = (s: string) => `/?from=${s}&to=${s}`;
 
   const originSlices = originAgg.map((o) => ({
@@ -161,11 +169,11 @@ export default async function DashboardPage({
         <form method="get" className="flex items-end gap-2 flex-wrap">
           <div>
             <label className="label">De</label>
-            <input type="date" name="from" defaultValue={ymd(rangeStart)} max={ymd(new Date())} className="input" style={{ width: 150 }} />
+            <input type="date" name="from" defaultValue={fromStr} max={todayStr} className="input" style={{ width: 150 }} />
           </div>
           <div>
             <label className="label">Até</label>
-            <input type="date" name="to" defaultValue={ymd(rangeEnd)} max={ymd(new Date())} className="input" style={{ width: 150 }} />
+            <input type="date" name="to" defaultValue={toStr} max={todayStr} className="input" style={{ width: 150 }} />
           </div>
           <button className="btn btn-primary">Aplicar</button>
           <div className="flex gap-1 flex-wrap">
