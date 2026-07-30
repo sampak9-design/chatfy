@@ -137,13 +137,15 @@ export async function runFlowFrom(bot: Bot, lead: Lead, startStepId: string) {
 
 /**
  * Start (or restart) a flow for a lead from its entry step.
+ * Returns false if the flow has no entry step (nothing was sent) — the caller
+ * can surface that as a misconfiguration instead of a silent success.
  */
-export async function startFlow(bot: Bot, lead: Lead, flowId: string) {
+export async function startFlow(bot: Bot, lead: Lead, flowId: string): Promise<boolean> {
   const entry = await prisma.flowStep.findFirst({
     where: { flowId, isEntry: true },
     orderBy: { createdAt: "asc" },
   });
-  if (!entry) return;
+  if (!entry) return false;
 
   // New run token: any delayed step-jobs from a previous run become stale and
   // are skipped by the worker, so re-/start restarts cleanly without duplicates.
@@ -151,6 +153,7 @@ export async function startFlow(bot: Bot, lead: Lead, flowId: string) {
   await prisma.lead.update({ where: { id: lead.id }, data: { flowToken: token } });
 
   await runFlowFrom(bot, { ...lead, flowToken: token }, entry.id);
+  return true;
 }
 
 /**

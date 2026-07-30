@@ -2,8 +2,9 @@ import { prisma } from "@/lib/db";
 import { notFound, redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, Workflow, PauseCircle, PlayCircle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Workflow, PauseCircle, PlayCircle, CheckCircle2, Play, AlertTriangle } from "lucide-react";
 import { ownsSequence } from "@/lib/active-bot";
+import { processSequenceNow } from "@/lib/sequence-engine";
 import { requireOwnerId } from "@/lib/auth";
 import { LocalTime } from "@/components/LocalTime";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
@@ -48,6 +49,15 @@ async function toggleActive(formData: FormData) {
   revalidatePath(`/sequences/${id}`);
 }
 
+async function processNow(formData: FormData) {
+  "use server";
+  const id = String(formData.get("id"));
+  if (!(await ownsSequence(id))) return;
+  await processSequenceNow(id);
+  revalidatePath(`/sequences/${id}`);
+  redirect(`/sequences/${id}?processed=1`);
+}
+
 export default async function SequenceDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await requireOwnerId();
@@ -62,9 +72,15 @@ export default async function SequenceDetail({ params }: { params: Promise<{ id:
   });
   if (!seq) notFound();
 
-  const [flows, sentCount, recent] = await Promise.all([
+  const stepFlowIds = seq.steps.map((s) => s.flowId);
+  const [flows, sentCount, failedCount, activeLeadCount, entrySteps, recent] = await Promise.all([
     prisma.flow.findMany({ where: { botId: seq.botId }, orderBy: { name: "asc" } }),
     prisma.sequenceDelivery.count({ where: { sequenceId: id, status: "sent" } }),
+    prisma.sequenceDelivery.count({ where: { sequenceId: id, status: "failed" } }),
+    prisma.lead.count({ where: { botId: seq.botId, status: "active" } }),
+    stepFlowIds.length
+      ? prisma.flowStep.findMany({ where: { flowId: { in: stepFlowIds }, isEntry: true }, select: { flowId: true }, distinct: ["flowId"] })
+      : Promise.resolve([]),
     prisma.sequenceDelivery.findMany({
       where: { sequenceId: id, status: "sent" },
       orderBy: { createdAt: "desc" },
@@ -73,6 +89,9 @@ export default async function SequenceDetail({ params }: { params: Promise<{ id:
     }),
   ]);
 
+  const flowsWithEntry = new Set(entrySteps.map((s) => s.flowId));
+  const hasDay1 = seq.steps.some((s) => s.day === 1);
+  const brokenSteps = seq.steps.filter((s) => !flowsWithEntry.has(s.flowId));
   const nextDay = (seq.steps.at(-1)?.day ?? 0) + 1;
 
   return (
@@ -94,6 +113,38 @@ export default async function SequenceDetail({ params }: { params: Promise<{ id:
           Você ainda não tem fluxos neste bot. Crie os fluxos de cada dia em <Link href="/flows" style={{ color: "var(--primary)" }}>Fluxos</Link> e volte aqui pra montá-los na sequência.
         </div>
       )}
+
+      {/* Diagnóstico + Processar agora */}
+      <div className="card p-5 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="font-semibold">Diagnóstico</h2>
+          <form action={processNow}>
+            <input type="hidden" name="id" value={seq.id} />
+            <button className="btn btn-primary"><Play className="w-4 h-4" /> Processar agora</button>
+          </form>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+          <Stat label="Status" value={seq.active ? "ativa" : "pausada"} ok={seq.active} />
+          <Stat label="Tem Dia 1?" value={hasDay1 ? "sim" : "não"} ok={hasDay1} />
+          <Stat label="Leads ativos" value={String(activeLeadCount)} />
+          <Stat label="Falhas" value={String(failedCount)} ok={failedCount === 0} />
+        </div>
+
+        {!seq.active && (
+          <Warn>A sequência está <b>pausada</b> — nenhum dia é enviado. Clique em <b>Ativar</b> no topo.</Warn>
+        )}
+        {seq.steps.length > 0 && !hasDay1 && (
+          <Warn>Não existe um passo <b>Dia 1</b>. Quem entra agora fica sem receber na hora — adicione o Dia 1 abaixo.</Warn>
+        )}
+        {brokenSteps.length > 0 && (
+          <Warn>
+            {brokenSteps.length} dia(s) apontam pra um fluxo <b>sem bloco “Início” conectado</b> (Dia {brokenSteps.map((s) => s.day).join(", ")}) — esses não enviam. Abra o fluxo, ligue o bloco <b>Início</b> na primeira mensagem e salve.
+          </Warn>
+        )}
+        <p className="text-[11px]" style={{ color: "var(--text-faint)" }}>
+          “Processar agora” roda o funil na hora pra todos os leads ativos (útil pra inscrever quem já tinha entrado). O avanço automático diário roda sozinho a cada 15 min no worker.
+        </p>
+      </div>
 
       {/* Add / edit a day */}
       <form action={addStep} className="card p-5 space-y-3">
@@ -181,6 +232,25 @@ export default async function SequenceDetail({ params }: { params: Promise<{ id:
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
+  const color = ok === undefined ? "var(--text)" : ok ? "var(--success)" : "var(--danger)";
+  return (
+    <div className="rounded-lg px-3 py-2" style={{ background: "var(--surface-2)" }}>
+      <div className="text-[11px] uppercase tracking-wide" style={{ color: "var(--text-faint)" }}>{label}</div>
+      <div className="font-semibold mt-0.5" style={{ color }}>{value}</div>
+    </div>
+  );
+}
+
+function Warn({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2 text-sm rounded-lg px-3 py-2" style={{ background: "rgba(234,179,8,0.10)", color: "var(--text)" }}>
+      <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#eab308" }} />
+      <span>{children}</span>
     </div>
   );
 }

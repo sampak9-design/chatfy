@@ -60,7 +60,15 @@ async function deliverForLead(bot: Bot, lead: Lead, sequences: SequenceWithSteps
       if (!send) continue; // past day → recorded as skipped, nothing to send
 
       try {
-        await startFlow(bot, lead, step.flowId);
+        const sent = await startFlow(bot, lead, step.flowId);
+        if (!sent) {
+          // Flow has no connected "Início" step → nothing to send. Mark as failed
+          // so it shows up as a problem instead of a phantom "sent".
+          console.error("[sequence] flow has no entry step", { seq: seq.id, step: step.id, flow: step.flowId });
+          await prisma.sequenceDelivery
+            .update({ where: { stepId_leadId: { stepId: step.id, leadId: lead.id } }, data: { status: "failed" } })
+            .catch(() => {});
+        }
       } catch (err) {
         console.error("[sequence] send failed", { seq: seq.id, step: step.id, lead: lead.id, err });
         await prisma.sequenceDelivery
@@ -79,6 +87,32 @@ export async function processSequencesForLead(bot: Bot, lead: Lead) {
   });
   if (sequences.length === 0) return;
   await deliverForLead(bot, lead, sequences, Date.now());
+}
+
+/** Run one sequence now against all active leads of its bot (used by the "Processar agora" button). */
+export async function processSequenceNow(sequenceId: string) {
+  const now = Date.now();
+  const seq = await prisma.sequence.findUnique({
+    where: { id: sequenceId },
+    include: { steps: { orderBy: { day: "asc" } } },
+  });
+  if (!seq || !seq.active) return;
+  const bot = await prisma.bot.findUnique({ where: { id: seq.botId } });
+  if (!bot) return;
+
+  let cursor: string | undefined;
+  for (;;) {
+    const leads = await prisma.lead.findMany({
+      where: { botId: seq.botId, status: "active" },
+      take: 500,
+      orderBy: { id: "asc" },
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+    });
+    if (leads.length === 0) break;
+    for (const lead of leads) await deliverForLead(bot, lead, [seq], now);
+    if (leads.length < 500) break;
+    cursor = leads[leads.length - 1].id;
+  }
 }
 
 /** Periodic sweep (worker tick): advance every active lead of every bot that has sequences. */
