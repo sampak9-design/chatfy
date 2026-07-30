@@ -1,11 +1,36 @@
 import { getSession, isSuperAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
-import { User, KeyRound, Server, ExternalLink, Users, Plus } from "lucide-react";
+import { User, KeyRound, Server, ExternalLink, Users, Plus, Bell, Send } from "lucide-react";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
+import { getActiveBot, getOwnedBot } from "@/lib/active-bot";
+import { tgSend } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
+
+async function saveNotify(formData: FormData) {
+  "use server";
+  const botId = String(formData.get("botId"));
+  if (!(await getOwnedBot(botId))) return;
+  const notifyChatId = String(formData.get("notifyChatId") || "").trim() || null;
+  await prisma.bot.update({ where: { id: botId }, data: { notifyChatId } });
+  revalidatePath("/settings");
+  redirect("/settings?notify=saved");
+}
+
+async function testNotify(formData: FormData) {
+  "use server";
+  const botId = String(formData.get("botId"));
+  const bot = await getOwnedBot(botId);
+  if (!bot?.notifyChatId) return redirect("/settings?notify=nochat");
+  const res = await tgSend(bot.token, {
+    chatId: bot.notifyChatId,
+    text: "✅ <b>Teste de notificação</b>\nSe você está vendo isso, as notificações do bot estão funcionando neste canal.",
+  });
+  redirect(`/settings?notify=${res.ok ? "testok" : "testfail"}`);
+}
 
 async function createAccount(formData: FormData) {
   "use server";
@@ -36,12 +61,14 @@ async function deleteAccount(formData: FormData) {
   revalidatePath("/settings");
 }
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ notify?: string }> }) {
   const session = await getSession();
   const user = session ? await prisma.adminUser.findUnique({ where: { id: session.sub } }) : null;
   const superAdmin = !!user?.isSuperAdmin;
   const ownerId = session?.sub;
   const appUrl = process.env.APP_URL || "(não configurado)";
+  const activeBot = await getActiveBot();
+  const notifyStatus = (await searchParams).notify;
 
   const [botCount, leadCount, accounts] = await Promise.all([
     prisma.bot.count({ where: { ownerId } }),
@@ -132,6 +159,55 @@ export default async function SettingsPage() {
         </div>
       )}
 
+      {/* Integrações — notificações de mensagens recebidas */}
+      <div className="card p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <Bell className="w-4 h-4" style={{ color: "var(--text-dim)" }} />
+          <h2 className="font-semibold">Integrações · Notificações</h2>
+        </div>
+        <p className="text-sm" style={{ color: "var(--text-dim)" }}>
+          Receba um aviso num canal/grupo do Telegram toda vez que um usuário mandar mensagem pro bot.
+        </p>
+
+        {notifyStatus === "saved" && <Note ok>Canal de notificação salvo.</Note>}
+        {notifyStatus === "testok" && <Note ok>Mensagem de teste enviada! Confira o canal.</Note>}
+        {notifyStatus === "testfail" && <Note>Falhou ao enviar. Verifique se o bot é <b>admin</b> do canal e se o ID está certo.</Note>}
+        {notifyStatus === "nochat" && <Note>Salve um ID de canal primeiro.</Note>}
+
+        {!activeBot ? (
+          <p className="text-sm" style={{ color: "var(--text-faint)" }}>Cadastre um bot primeiro pra configurar as notificações.</p>
+        ) : (
+          <>
+            <form action={saveNotify} className="space-y-3">
+              <input type="hidden" name="botId" value={activeBot.id} />
+              <div>
+                <label className="label">ID do canal/grupo (bot: {activeBot.name})</label>
+                <input
+                  name="notifyChatId"
+                  defaultValue={activeBot.notifyChatId || ""}
+                  className="input font-mono text-sm"
+                  placeholder="-1001234567890  ou  @meucanal"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" className="btn btn-primary">Salvar</button>
+                {activeBot.notifyChatId && (
+                  <button type="submit" formAction={testNotify} className="btn btn-ghost"><Send className="w-4 h-4" /> Enviar teste</button>
+                )}
+              </div>
+            </form>
+
+            <div className="text-[11px] space-y-1 rounded-lg p-3" style={{ background: "var(--surface-2)", color: "var(--text-faint)" }}>
+              <div className="font-medium" style={{ color: "var(--text-dim)" }}>Como configurar:</div>
+              <div>1. Crie um canal ou grupo e <b>adicione o bot como administrador</b>.</div>
+              <div>2. Pegue o ID: encaminhe uma mensagem do canal pra <a href="https://t.me/userinfobot" target="_blank" rel="noopener" style={{ color: "var(--primary)" }}>@userinfobot</a> (ou use <code>@username</code> se o canal for público).</div>
+              <div>3. Cole o ID aqui, salve e clique em <b>Enviar teste</b>.</div>
+              <div>Deixe em branco pra desligar as notificações.</div>
+            </div>
+          </>
+        )}
+      </div>
+
       <div className="card p-6 space-y-3">
         <div className="flex items-center gap-2 mb-2">
           <Server className="w-4 h-4" style={{ color: "var(--text-dim)" }} />
@@ -172,6 +248,20 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
     <div className="flex items-center justify-between text-sm py-1">
       <span style={{ color: "var(--text-faint)" }}>{label}</span>
       <span className={`${mono ? "font-mono text-xs" : ""} truncate`} style={{ color: "var(--text)", maxWidth: "60%" }}>{value}</span>
+    </div>
+  );
+}
+
+function Note({ children, ok }: { children: React.ReactNode; ok?: boolean }) {
+  return (
+    <div
+      className="text-sm rounded-lg px-3 py-2"
+      style={{
+        background: ok ? "rgba(34,197,94,0.10)" : "rgba(234,179,8,0.10)",
+        color: "var(--text)",
+      }}
+    >
+      {children}
     </div>
   );
 }

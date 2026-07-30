@@ -45,6 +45,9 @@ model Bot {
   metaTestCode    String?  // optional: filter as "test_event" in Events Manager
   // Postback secret (corretora calls /api/track/registered?secret=...)
   postbackSecret  String?
+  // Notificações: chat_id de um canal/grupo (onde o bot é admin) que recebe aviso
+  // quando um usuário manda mensagem pro bot. Null = desligado.
+  notifyChatId    String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

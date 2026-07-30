@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { tgAnswerCallback } from "@/lib/telegram";
+import { tgAnswerCallback, tgSend } from "@/lib/telegram";
 import { handleButtonCallback, startFlow } from "@/lib/flow-engine";
 import { processSequencesForLead } from "@/lib/sequence-engine";
 import { sendCapiEvent } from "@/lib/meta-capi";
@@ -71,6 +71,32 @@ async function storeIncoming(botId: string, leadId: string, msg: TgMessage) {
       fileId: fileId || null,
     },
   });
+}
+
+function escapeHtml(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Notify the configured channel/group that a user sent a message to the bot. */
+async function notifyIncoming(bot: Bot, lead: Lead, msg: TgMessage) {
+  if (!bot.notifyChatId) return;
+  const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || `id ${lead.telegramId}`;
+  const uname = lead.username ? ` (@${lead.username})` : "";
+  let body = msg.text || msg.caption || "";
+  if (!body) {
+    body = msg.photo ? "🖼️ [imagem]"
+      : msg.video ? "🎥 [vídeo]"
+      : msg.audio || msg.voice ? "🎧 [áudio]"
+      : msg.document ? "📎 [documento]"
+      : msg.sticker ? "🩷 [figurinha]"
+      : "[mensagem]";
+  }
+  const text =
+    `📩 <b>Nova mensagem no bot</b> — ${escapeHtml(bot.name)}\n` +
+    `👤 ${escapeHtml(name)}${escapeHtml(uname)}\n` +
+    `🆔 <code>${lead.telegramId}</code>\n\n` +
+    escapeHtml(body).slice(0, 3500);
+  await tgSend(bot.token, { chatId: bot.notifyChatId, text }).catch((e) => console.error("[notify]", e));
 }
 
 async function upsertLead(
@@ -184,6 +210,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ botId: str
     } else if (msg?.from) {
       const lead = await upsertLead(bot, msg.from, "start");
       await storeIncoming(bot.id, lead.id, msg);
+      notifyIncoming(bot, lead, msg).catch((e) => console.error("[notify]", e));
     }
   } catch (e) {
     console.error("[webhook]", e);
