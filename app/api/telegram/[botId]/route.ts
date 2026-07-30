@@ -96,7 +96,14 @@ async function notifyIncoming(bot: Bot, lead: Lead, msg: TgMessage) {
     `👤 ${escapeHtml(name)}${escapeHtml(uname)}\n` +
     `🆔 <code>${lead.telegramId}</code>\n\n` +
     escapeHtml(body).slice(0, 3500);
-  await tgSend(bot.token, { chatId: bot.notifyChatId, text }).catch((e) => console.error("[notify]", e));
+
+  // Link direto pra abrir a conversa desse lead no Inbox do painel.
+  const appUrl = process.env.APP_URL;
+  const buttons = appUrl
+    ? [[{ text: "💬 Abrir conversa no painel", url: `${appUrl}/inbox?lead=${lead.id}` }]]
+    : undefined;
+
+  await tgSend(bot.token, { chatId: bot.notifyChatId, text, buttons }).catch((e) => console.error("[notify]", e));
 }
 
 async function upsertLead(
