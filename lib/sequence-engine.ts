@@ -1,17 +1,16 @@
 /**
- * Sequence engine — day-based drip anchored to each lead's ENROLLMENT.
+ * Sequence engine — drip diário ancorado na ÚLTIMA entrega (não na inscrição).
  *
  * Ao ser inscrito (primeiro /start ou "Processar agora"), grava-se startedAt.
- * "Dia atual" do lead = dias completos desde startedAt + 1 → TODO mundo começa
- * no Dia 1 a partir da inscrição, independente de quando entrou no bot.
- *   - inscrito agora     → dia 1
- *   - inscrito ontem     → dia 2
+ * O Dia 1 sai imediatamente. Cada dia seguinte só sai quando passou o intervalo
+ * desde a entrega do dia anterior: (dia_seguinte - dia_anterior) * 24h.
  *
- * Regras:
- *   - envia (uma vez) todos os passos com day <= dia atual que ainda não foram
- *     entregues, em ordem. Normalmente é 1 por dia; se o worker ficou parado, os
- *     dias represados saem em sequência (sem pular nenhum).
- *   - passos futuros (day > dia atual) esperam o dia chegar.
+ * Regras (a cada processamento, no máximo 1 passo por lead):
+ *   - pega o próximo passo pendente (menor dia ainda não entregue);
+ *   - envia só se já passou o intervalo desde a última entrega (Dia 1 = imediato).
+ *
+ * Por ancorar na última entrega, gaps (worker parado, re-/start de lead antigo)
+ * viram ATRASO — nunca rajada. Um lead nunca recebe vários dias de uma vez.
  *
  * Idempotência: SequenceDelivery tem unique(stepId, leadId) — reserva antes de
  * enviar, então webhook e tick nunca disparam o mesmo dia duas vezes.
@@ -64,27 +63,51 @@ async function deliverForLead(bot: Bot, lead: Lead, sequences: SequenceWithSteps
   for (const seq of sequences) {
     if (seq.steps.length === 0) continue;
     const startedAt = await anchorStartedAt(seq.id, lead.id);
-    const day = Math.floor(Math.max(0, now - startedAt.getTime()) / DAY_MS) + 1;
 
-    for (const step of seq.steps) {
-      if (step.day > day) break; // ordered by day → nothing else is due yet
-      const reserved = await claim(seq.id, step.id, lead.id);
-      if (!reserved) continue; // already delivered
+    // Já entregues (qualquer status conta como "passo cumprido" pra progressão).
+    const delivered = await prisma.sequenceDelivery.findMany({
+      where: { sequenceId: seq.id, leadId: lead.id },
+      select: { stepId: true, createdAt: true },
+    });
+    const deliveredAt = new Map<string, Date>();
+    for (const d of delivered) deliveredAt.set(d.stepId, d.createdAt);
 
-      try {
-        const sent = await startFlow(bot, lead, step.flowId);
-        if (!sent) {
-          console.error("[sequence] flow has no entry step", { seq: seq.id, step: step.id, flow: step.flowId });
-          await prisma.sequenceDelivery
-            .update({ where: { stepId_leadId: { stepId: step.id, leadId: lead.id } }, data: { status: "failed" } })
-            .catch(() => {});
-        }
-      } catch (err) {
-        console.error("[sequence] send failed", { seq: seq.id, step: step.id, lead: lead.id, err });
+    // Próximo passo pendente (menor dia ainda não entregue). Steps vêm ordenados por dia.
+    const nextStep = seq.steps.find((s) => !deliveredAt.has(s.id));
+    if (!nextStep) continue; // funil concluído pra esse lead
+
+    // Referência de tempo + intervalo exigido — ancora na ÚLTIMA entrega, não na
+    // inscrição, então gaps viram atraso (nunca rajada) e no máx. 1 dia por vez.
+    const deliveredSteps = seq.steps.filter((s) => deliveredAt.has(s.id));
+    let referenceAt: number;
+    let requiredGapMs: number;
+    if (deliveredSteps.length > 0) {
+      const last = deliveredSteps[deliveredSteps.length - 1]; // maior dia já entregue
+      referenceAt = deliveredAt.get(last.id)!.getTime();
+      requiredGapMs = Math.max(0, nextStep.day - last.day) * DAY_MS;
+    } else {
+      referenceAt = startedAt.getTime();
+      requiredGapMs = Math.max(0, nextStep.day - 1) * DAY_MS; // Dia 1 = imediato
+    }
+
+    if (now - referenceAt < requiredGapMs) continue; // ainda não deu o intervalo
+
+    const reserved = await claim(seq.id, nextStep.id, lead.id);
+    if (!reserved) continue; // corrida: outro processo já enviou
+
+    try {
+      const sent = await startFlow(bot, lead, nextStep.flowId);
+      if (!sent) {
+        console.error("[sequence] flow has no entry step", { seq: seq.id, step: nextStep.id, flow: nextStep.flowId });
         await prisma.sequenceDelivery
-          .update({ where: { stepId_leadId: { stepId: step.id, leadId: lead.id } }, data: { status: "failed" } })
+          .update({ where: { stepId_leadId: { stepId: nextStep.id, leadId: lead.id } }, data: { status: "failed" } })
           .catch(() => {});
       }
+    } catch (err) {
+      console.error("[sequence] send failed", { seq: seq.id, step: nextStep.id, lead: lead.id, err });
+      await prisma.sequenceDelivery
+        .update({ where: { stepId_leadId: { stepId: nextStep.id, leadId: lead.id } }, data: { status: "failed" } })
+        .catch(() => {});
     }
   }
 }
