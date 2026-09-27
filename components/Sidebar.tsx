@@ -102,10 +102,11 @@ export function Sidebar({ adminEmail, onNavigate }: { adminEmail?: string; onNav
       </>
     );
     const baseStyle: React.CSSProperties = {
-      background: active ? "var(--surface-3)" : "transparent",
+      background: active ? "rgba(249, 115, 22, 0.10)" : "transparent",
       color: dim ? "var(--text-faint)" : active ? "var(--text)" : "var(--text-dim)",
-      borderLeft: active ? "3px solid var(--primary)" : "3px solid transparent",
-      paddingLeft: inGroup ? (active ? 33 : 36) : active ? 9 : 12,
+      border: active ? "1px solid var(--primary)" : "1px solid transparent",
+      borderRadius: 12,
+      paddingLeft: inGroup ? 24 : 12,
       cursor: dim ? "not-allowed" : "pointer",
       opacity: dim ? 0.55 : 1,
     };
@@ -185,11 +186,11 @@ export function Sidebar({ adminEmail, onNavigate }: { adminEmail?: string; onNav
         </div>
         <button
           type="submit"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm w-full transition-colors"
-          style={{ color: "var(--text-dim)" }}
+          className="flex items-center justify-between gap-3 px-4 py-3 text-sm w-full font-medium transition-opacity hover:opacity-90"
+          style={{ background: "#fafafa", color: "#0a0a0b", borderRadius: 14 }}
         >
+          <span className="uppercase tracking-wide">Sair</span>
           <LogOut className="w-4 h-4" />
-          Sair
         </button>
       </form>
     </aside>

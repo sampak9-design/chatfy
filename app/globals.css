@@ -1,21 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #05080f;
-  --surface: #0b0f18;
-  --surface-2: #131823;
-  --surface-3: #1a2036;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
-  --text: #f1f5f9;
-  --text-dim: #94a3b8;
-  --text-faint: #64748b;
+  /* PLATINUM — neutral warm near-black, orange accent */
+  --bg: #0a0a0b;
+  --surface: #141416;
+  --surface-2: #1b1b1e;
+  --surface-3: #26262b;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
+  --text: #fafafa;
+  --text-dim: #a1a1aa;
+  --text-faint: #71717a;
   --primary: #f97316;
-  --primary-hover: #ea6c0a;
+  --primary-hover: #fb8a3c;
   --success: #22c55e;
   --danger: #ef4444;
   --warning: #eab308;
   --info: #3b82f6;
+  --radius: 16px;
 }
 
 * { box-sizing: border-box; }
@@ -38,7 +40,7 @@ html, body {
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius);
   }
   .card-hover {
     transition: border-color .15s, background .15s;
@@ -52,20 +54,21 @@ html, body {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 8px 14px;
-    border-radius: 8px;
+    padding: 9px 15px;
+    border-radius: 11px;
     font-size: 14px;
     font-weight: 500;
-    transition: background .15s, border-color .15s, color .15s;
+    transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
     cursor: pointer;
     border: 1px solid transparent;
     user-select: none;
   }
   .btn-primary {
-    background: var(--primary);
+    background: linear-gradient(180deg, #fb8a3c 0%, #f97316 100%);
     color: white;
+    box-shadow: 0 6px 18px -4px rgba(249, 115, 22, 0.5);
   }
-  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-primary:hover { background: linear-gradient(180deg, #fc9550 0%, #fb8121 100%); box-shadow: 0 8px 22px -4px rgba(249, 115, 22, 0.6); }
   .btn-ghost {
     background: transparent;
     border-color: var(--border);
@@ -82,14 +85,14 @@ html, body {
     width: 100%;
     background: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 12px;
+    border-radius: 11px;
+    padding: 10px 13px;
     font-size: 14px;
     color: var(--text);
     outline: none;
-    transition: border-color .15s;
+    transition: border-color .15s, box-shadow .15s;
   }
-  .input:focus { border-color: var(--primary); }
+  .input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15); }
   .input::placeholder { color: var(--text-faint); }
   .label {
     display: block;
@@ -111,11 +114,11 @@ html, body {
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
-  .pill-success { background: rgba(34, 197, 94, 0.12); color: #86efac; }
-  .pill-danger  { background: rgba(239, 68, 68, 0.12); color: #fca5a5; }
-  .pill-warning { background: rgba(234, 179, 8, 0.12); color: #fde047; }
-  .pill-info    { background: rgba(59, 130, 246, 0.12); color: #93c5fd; }
-  .pill-muted   { background: rgba(255,255,255,0.06); color: var(--text-dim); }
+  .pill-success { background: rgba(34, 197, 94, 0.10); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.30); }
+  .pill-danger  { background: rgba(239, 68, 68, 0.10); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.30); }
+  .pill-warning { background: rgba(234, 179, 8, 0.10); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.30); }
+  .pill-info    { background: rgba(59, 130, 246, 0.10); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.30); }
+  .pill-muted   { background: rgba(255,255,255,0.05); color: var(--text-dim); border: 1px solid rgba(255,255,255,0.10); }
 }
 
 /* React Flow dark overrides */
