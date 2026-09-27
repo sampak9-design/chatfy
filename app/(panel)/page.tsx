@@ -4,14 +4,15 @@ import Link from "next/link";
 import {
   Users, Bot, Search, SlidersHorizontal, Upload, Download, Plus,
   Settings2, BarChart3, MoreHorizontal, ArrowUpRight, ArrowDownLeft,
-  History, Workflow, CalendarClock, ChevronRight,
+  History, CalendarClock, ChevronRight, Activity, AlertTriangle,
 } from "lucide-react";
 import { BarChart } from "@/components/charts/BarChart";
 import { SegmentedBar } from "@/components/SegmentedBar";
-import { BotCard } from "@/components/BotCard";
+import { BotLinkCard } from "@/components/BotLinkCard";
 import { EmptyState } from "@/components/EmptyState";
 import { LocalTime } from "@/components/LocalTime";
 import { getActiveBot } from "@/lib/active-bot";
+import { getSystemHealth } from "@/lib/health";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +90,7 @@ export default async function DashboardPage({
   const prevEnd = new Date(rangeStart.getTime() - 1);
   const prevStart = new Date(rangeStart.getTime() - spanDays * DAY_MS);
 
-  const [total, active, blocked, periodCount, prevCount, recentLeads, leadsByDay, originAgg, sequences] =
+  const [total, active, blocked, periodCount, prevCount, recentLeads, leadsByDay, originAgg, sequences, health] =
     await Promise.all([
       prisma.lead.count({ where: { botId: bot.id } }),
       prisma.lead.count({ where: { botId: bot.id, status: "active" } }),
@@ -121,6 +122,7 @@ export default async function DashboardPage({
         take: 3,
         include: { _count: { select: { steps: true, deliveries: true } } },
       }),
+      getSystemHealth(),
     ]);
 
   // Série do gráfico
@@ -329,7 +331,7 @@ export default async function DashboardPage({
             </Link>
           </div>
 
-          <BotCard name={bot.name} username={bot.username} since={bot.createdAt} paused={bot.paused} />
+          <BotLinkCard name={bot.name} username={bot.username} paused={bot.paused} />
 
           {/* Quick Action */}
           <div>
@@ -400,21 +402,43 @@ export default async function DashboardPage({
             <Link href="/sequences" className="btn btn-ghost w-full mt-3">Ver todas</Link>
           </div>
 
-          {/* Variação do período */}
-          <div className="card p-5">
-            <div className="flex items-center gap-2 mb-1">
-              <Workflow className="w-4 h-4" style={{ color: "var(--text-dim)" }} />
-              <h2 className="font-semibold">No período</h2>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-semibold">{periodCount.toLocaleString("pt-BR")}</span>
-              <span className="text-sm" style={{ color: delta >= 0 ? "var(--success)" : "var(--danger)" }}>
-                {delta >= 0 ? "+" : ""}{delta}%
+          {/* Saúde do sistema */}
+          <div className="card p-5 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4" style={{ color: "var(--text-dim)" }} />
+                <h2 className="font-semibold">Saúde do sistema</h2>
+              </div>
+              <span className={`pill ${health.workerOnline ? "pill-success" : "pill-danger"}`}>
+                {health.ok ? (health.workerOnline ? "online" : "offline") : "sem redis"}
               </span>
             </div>
-            <p className="text-xs mt-1" style={{ color: "var(--text-faint)" }}>
-              vs. período anterior ({prevCount.toLocaleString("pt-BR")})
-            </p>
+
+            <HealthRow label="Worker" value={health.workerOnline ? `${health.workers} ativo(s)` : "parado"} bad={!health.workerOnline} />
+            <HealthRow
+              label="Último ciclo"
+              value={health.lastTickAt ? <LocalTime iso={health.lastTickAt.toISOString()} /> : "—"}
+              bad={!health.lastTickAt}
+            />
+            <HealthRow label="Agendamentos" value={`${health.scheduled}`} />
+            <HealthRow label="Falhas" value={`${health.failed}`} bad={health.failed > 0} />
+
+            {!health.workerOnline && (
+              <div className="flex items-start gap-2 text-xs rounded-lg px-3 py-2" style={{ background: "rgba(239,68,68,0.10)" }}>
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#fca5a5" }} />
+                <span>
+                  O worker não está rodando — as sequências não avançam e os delays de fluxo não disparam.
+                  Suba o serviço <code>npm run worker</code> no Railway.
+                </span>
+              </div>
+            )}
+
+            <div className="pt-1 text-xs flex items-center justify-between" style={{ color: "var(--text-faint)" }}>
+              <span>Variação no período</span>
+              <span style={{ color: delta >= 0 ? "var(--success)" : "var(--danger)" }}>
+                {delta >= 0 ? "+" : ""}{delta}% vs. anterior ({prevCount.toLocaleString("pt-BR")})
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -439,6 +463,15 @@ function Kpi({ label, value, badge, tone }: { label: string; value: number; badg
           {badge}
         </span>
       </div>
+    </div>
+  );
+}
+
+function HealthRow({ label, value, bad }: { label: string; value: React.ReactNode; bad?: boolean }) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span style={{ color: "var(--text-faint)" }}>{label}</span>
+      <span style={{ color: bad ? "#fca5a5" : "var(--text)" }}>{value}</span>
     </div>
   );
 }

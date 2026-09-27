@@ -1,6 +1,11 @@
+"use client";
+
+import { useState } from "react";
+
 /**
- * Bar chart no estilo PLATINUM: barras escuras arredondadas, a maior destacada
- * em laranja com gradiente, ponto no topo e balão com o valor.
+ * Bar chart no estilo PLATINUM: barras escuras arredondadas; a barra
+ * selecionada (hover no desktop / toque no mobile) acende em laranja com
+ * gradiente, ponto no topo e balão com o valor.
  * SVG puro — sem dependência externa.
  */
 interface Point { x: string; y: number }
@@ -19,7 +24,6 @@ export function BarChart({ data, height = 280, showXLabels = true }: Props) {
   const innerH = H - PAD.top - PAD.bottom;
 
   const rawMax = Math.max(1, ...data.map((d) => d.y));
-  // Escala "redonda" pro eixo (5, 10, 15...)
   const step = Math.max(1, Math.ceil(rawMax / 4));
   const maxY = step * 4;
 
@@ -28,9 +32,11 @@ export function BarChart({ data, height = 280, showXLabels = true }: Props) {
   const bw = Math.max(6, Math.min(46, slot * 0.52));
   const radius = Math.min(bw / 2, 10);
 
-  // Índice da maior barra (a destacada)
-  let hi = 0;
-  for (let i = 1; i < data.length; i++) if (data[i].y > data[hi].y) hi = i;
+  // Barra destacada por padrão: a maior. Depois segue o hover/clique.
+  let defaultIdx = 0;
+  for (let i = 1; i < data.length; i++) if (data[i].y > data[defaultIdx].y) defaultIdx = i;
+  const [sel, setSel] = useState<number | null>(null);
+  const hi = sel ?? defaultIdx;
 
   const barPath = (x: number, y: number, w: number, h: number, r: number) => {
     const rr = Math.min(r, h);
@@ -53,7 +59,11 @@ export function BarChart({ data, height = 280, showXLabels = true }: Props) {
   const tipY = 6;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height }}>
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      style={{ width: "100%", height, touchAction: "manipulation" }}
+      onMouseLeave={() => setSel(null)}
+    >
       <defs>
         <linearGradient id="bc-hi" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#fdba74" />
@@ -98,13 +108,12 @@ export function BarChart({ data, height = 280, showXLabels = true }: Props) {
               fill={b.zero ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.09)"}
             />
           )}
-          <title>{`${b.label}: ${b.value}`}</title>
         </g>
       ))}
 
-      {/* balão do valor destacado */}
-      {top && data[hi]?.y > 0 && (
-        <g>
+      {/* balão do valor selecionado */}
+      {top && (
+        <g style={{ pointerEvents: "none" }}>
           <rect x={tipX} y={tipY} width={tipW} height={tipH} rx="9" fill="#000" stroke="rgba(255,255,255,0.14)" />
           <text x={tipX + tipW / 2} y={tipY + 20} textAnchor="middle" fontSize="14" fontWeight="600" fill="#fff">
             {tipText}
@@ -123,6 +132,23 @@ export function BarChart({ data, height = 280, showXLabels = true }: Props) {
             </text>
           );
         })}
+
+      {/* áreas de clique/hover — uma coluna inteira por barra, por cima de tudo */}
+      {bars.map((b, i) => (
+        <rect
+          key={`hit-${i}`}
+          x={PAD.left + slot * i}
+          y={PAD.top}
+          width={slot}
+          height={innerH}
+          fill="transparent"
+          style={{ cursor: "pointer" }}
+          onMouseEnter={() => setSel(i)}
+          onClick={() => setSel(i)}
+        >
+          <title>{`${b.label}: ${b.value}`}</title>
+        </rect>
+      ))}
     </svg>
   );
 }
